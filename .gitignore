@@ -3,3 +3,4 @@
 *.exe
 /pocket-relay
 *.log
+/node_modules/

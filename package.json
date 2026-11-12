@@ -1,0 +1,6 @@
+{
+  "name": "pocket-relay-ui-tests",
+  "private": true,
+  "scripts": {"test": "node --test tests/ui.test.cjs"},
+  "devDependencies": {"jsdom": "27.0.1"}
+}

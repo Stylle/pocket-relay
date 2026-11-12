@@ -3,3 +3,4 @@
 data
 *.exe
 *.log
+node_modules

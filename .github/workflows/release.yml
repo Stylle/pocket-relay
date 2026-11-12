@@ -22,6 +22,7 @@ jobs:
         with:
           node-version: 24
       - run: go test -race -timeout 180s -v ./... && go vet ./... && node --check web/app.js
+      - run: npm ci && npm test
       - name: Real SMB integration
         run: |
           sudo apt-get update -qq
