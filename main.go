@@ -122,6 +122,12 @@ func openApp(dir string) (*app, error) {
 		db.Close()
 		return nil, e
 	}
+	// A process may have stopped between reserving an object and committing its
+	// message. Reclaim it through the same retryable deletion queue on startup.
+	if _, e = db.Exec(`UPDATE files SET deleted=1 WHERE deleted=-1`); e != nil {
+		db.Close()
+		return nil, e
+	}
 	defaults, _ := json.Marshal(settings{GuestHours: 1, MaxMB: 256, QuotaMB: 5120, DeviceTemplate: "{device} · {ip}", ActiveStore: "local"})
 	if _, e = db.Exec(`INSERT OR IGNORE INTO config(id,value) VALUES(1,?)`, string(defaults)); e != nil {
 		db.Close()
@@ -312,7 +318,11 @@ func main() {
 		defer cancel()
 		server.Shutdown(c)
 	}()
-	log.Printf("Pocket Relay 已启动：http://localhost%s；首次初始化请在可信网络完成。", address)
+	urlAddress := address
+	if strings.HasPrefix(urlAddress, ":") {
+		urlAddress = "localhost" + urlAddress
+	}
+	log.Printf("Pocket Relay 已启动：http://%s；首次初始化请在可信网络完成。", urlAddress)
 	if e = server.ListenAndServe(); e != nil && !errors.Is(e, http.ErrServerClosed) {
 		log.Fatal(e)
 	}

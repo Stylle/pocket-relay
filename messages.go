@@ -110,10 +110,13 @@ func (a *app) sendMessage(w http.ResponseWriter, r *http.Request) {
 			os.Remove(temp)
 		}
 		if stored && !committed {
+			a.db.Exec(`UPDATE files SET deleted=1 WHERE id=?`, fileID)
 			if st, e := a.getStore(storeID); e == nil {
 				ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 				defer cancel()
-				_ = a.remove(ctx, st, fileID)
+				if a.remove(ctx, st, fileID) == nil {
+					a.db.Exec(`DELETE FROM files WHERE id=? AND deleted=1`, fileID)
+				}
 			}
 		}
 	}()
@@ -231,11 +234,15 @@ func (a *app) sendMessage(w http.ResponseWriter, r *http.Request) {
 			fail(w, 503, "存储配置不可用")
 			return
 		}
+		if _, e = a.db.Exec(`INSERT INTO files(id,user_id,store_id,name,mime,size,sha256,deleted) VALUES(?,?,?,?,?,?,?,-1)`, fileID, u.ID, storeID, name, kind, size, digest); e != nil {
+			fail(w, 500, "无法登记文件传输，请重试")
+			return
+		}
+		stored = true
 		if e = a.put(r.Context(), st, fileID, temp); e != nil {
 			fail(w, 502, "存储写入失败，请检查存储连接及权限")
 			return
 		}
-		stored = true
 	}
 	// Recheck expiry after a long upload; a guest cannot publish after expiry.
 	if _, e := a.findUser(u.ID); e != nil {
@@ -258,7 +265,7 @@ func (a *app) sendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if fileID != "" {
-		_, e = tx.Exec(`INSERT INTO files(id,user_id,store_id,name,mime,size,sha256) VALUES(?,?,?,?,?,?,?)`, fileID, u.ID, storeID, name, kind, size, digest)
+		_, e = tx.Exec(`UPDATE files SET deleted=0 WHERE id=? AND user_id=? AND deleted=-1`, fileID, u.ID)
 		if e != nil {
 			fail(w, 500, "保存失败")
 			return

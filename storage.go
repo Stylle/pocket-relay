@@ -237,10 +237,17 @@ func (a *app) storeProbe(ctx context.Context, s store) error {
 	}
 	f.Close()
 	key := "probe-" + randomID()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			c, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			_ = a.remove(c, s, key)
+		}
+	}()
 	if e = a.put(ctx, s, key, name); e != nil {
 		return e
 	}
-	defer a.remove(ctx, s, key)
 	readback, e := os.CreateTemp(filepath.Join(a.dir, "tmp"), "probe-read-")
 	if e != nil {
 		return e
@@ -254,5 +261,9 @@ func (a *app) storeProbe(ctx context.Context, s store) error {
 	if e != nil || string(b) != "pocket-relay-storage-test" {
 		return errors.New("storage readback mismatch")
 	}
-	return a.remove(ctx, s, key)
+	e = a.remove(ctx, s, key)
+	if e == nil {
+		cleanup = false
+	}
+	return e
 }
