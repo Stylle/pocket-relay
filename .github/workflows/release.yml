@@ -1,0 +1,100 @@
+name: Test and publish
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: go test -race -timeout 180s -v ./... && go vet ./... && node --check web/app.js
+      - name: Real SMB integration
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y rclone samba
+          sudo systemctl stop smbd nmbd || true
+          bash tests/smb.sh
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: pocket-relay:test
+      - name: Container boot and non-root data persistence
+        run: |
+          set -euo pipefail
+          docker run -d --name relay-test -p 127.0.0.1:28182:8080 -v relay-test-data:/data pocket-relay:test
+          trap 'docker logs relay-test; docker rm -f relay-test; docker volume rm relay-test-data' EXIT
+          for n in $(seq 1 30); do curl -fsS http://127.0.0.1:28182/healthz && break || sleep 1; done
+          curl -fsS http://127.0.0.1:28182/api/status | grep '"setup":true'
+          test "$(docker exec relay-test id -u)" = 10001
+          docker exec relay-test rclone help backends | grep -i 'smb'
+          docker restart relay-test
+          for n in $(seq 1 30); do curl -fsS http://127.0.0.1:28182/healthz && break || sleep 1; done
+          curl -fsS http://127.0.0.1:28182/api/status | grep '"setup":true'
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/stylle/pocket-relay:latest,ghcr.io/stylle/pocket-relay:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          sbom: true
+          provenance: mode=max
+  dockerhub:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Detect Docker Hub credentials
+        id: auth
+        env:
+          HUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          HUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -n "$HUB_USER" ] && [ -n "$HUB_TOKEN" ]; then echo 'ready=true' >> "$GITHUB_OUTPUT"; else echo 'Docker Hub not configured; GHCR is the primary registry.'; fi
+      - uses: actions/checkout@v4
+        if: steps.auth.outputs.ready == 'true'
+      - uses: docker/setup-qemu-action@v3
+        if: steps.auth.outputs.ready == 'true'
+      - uses: docker/setup-buildx-action@v3
+        if: steps.auth.outputs.ready == 'true'
+      - uses: docker/login-action@v3
+        if: steps.auth.outputs.ready == 'true'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        if: steps.auth.outputs.ready == 'true'
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: stylle/pocket-relay:latest,stylle/pocket-relay:${{ github.ref_name }}

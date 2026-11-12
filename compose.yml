@@ -1,0 +1,17 @@
+services:
+  pocket-relay:
+    # 必填：镜像地址。私密 GHCR 镜像需先 docker login ghcr.io。
+    image: ghcr.io/stylle/pocket-relay:latest
+    container_name: pocket-relay
+    restart: always
+    ports:
+      # 可改：左侧为宿主机访问端口，右侧 8080 保持不变。
+      # 仅通过本机反代访问时可改成 "127.0.0.1:28182:8080"。
+      - "28182:8080"
+    volumes:
+      # 必须保留：数据库、密钥、本地文件都在 /data，无需任何环境变量。
+      # 默认命名卷由 Docker 管理权限，避免 NAS 绑定目录不可写。
+      - relay-data:/data
+
+volumes:
+  relay-data:

@@ -1,0 +1,13 @@
+# 本地源码构建，无需登录镜像仓库：docker compose -f compose.build.yml up -d --build
+services:
+  pocket-relay:
+    build: .
+    image: pocket-relay:local
+    container_name: pocket-relay
+    restart: always
+    ports:
+      - "28182:8080"
+    volumes:
+      - relay-data:/data
+volumes:
+  relay-data:

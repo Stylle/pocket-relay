@@ -1,0 +1,5 @@
+/data/
+/.tools/
+*.exe
+/pocket-relay
+*.log
