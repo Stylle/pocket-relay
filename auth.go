@@ -100,7 +100,7 @@ func (a *app) status(w http.ResponseWriter, r *http.Request) {
 	s := a.config()
 	var n int
 	a.db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&n)
-	reply(w, 200, map[string]any{"setup": n == 0, "public_registration": s.Public, "guest_hours": s.GuestHours})
+	reply(w, 200, map[string]any{"setup": n == 0, "public_registration": s.Public, "guest_hours": s.GuestHours, "version": version})
 }
 
 var validName = regexp.MustCompile(`^[\p{L}\p{N}_-]{2,40}$`)

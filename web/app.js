@@ -20,6 +20,8 @@ const state = {
   revealed: new Map(),
   loadedImages: new Set(),
   autoLoadImages: true,
+  privacyRevision: null,
+  revealing: new Set(),
   hasMore: false,
 };
 let toastTimer;
@@ -256,8 +258,16 @@ $("auth-form").onsubmit = async (e) => {
         method: "POST",
         body: JSON.stringify(
           state.enrollment
-            ? { enrollment: state.enrollment, code: $("code").value, remember: $("remember-login").checked }
-            : { name, code: $("code").value, remember: $("remember-login").checked },
+            ? {
+                enrollment: state.enrollment,
+                code: $("code").value,
+                remember: $("remember-login").checked,
+              }
+            : {
+                name,
+                code: $("code").value,
+                remember: $("remember-login").checked,
+              },
         ),
       },
     );
@@ -269,6 +279,8 @@ $("auth-form").onsubmit = async (e) => {
   }
 };
 function logoutLocal() {
+  closeOriginal();
+  state.privacyRevision = null;
   $("tg-token").value = "";
   state.generation++;
   state.revealed.clear();
@@ -296,7 +308,9 @@ $("logout").onclick = async () => {
   try {
     await json("/api/logout", { method: "POST" });
     logoutLocal();
-  } catch (_) { toast("退出未完成，请恢复网络后重试，避免记住状态仍然有效。", true); }
+  } catch (_) {
+    toast("退出未完成，请恢复网络后重试，避免记住状态仍然有效。", true);
+  }
 };
 document
   .querySelectorAll("[data-view]")
@@ -423,6 +437,133 @@ function isImage(m) {
     "image/avif",
   ].includes(m.mime);
 }
+function renderText(text) {
+  const p = node("p", "message-text");
+  for (const part of RelayMessageText.parse(text)) {
+    if (part.type === "text") {
+      p.append(document.createTextNode(part.text));
+      continue;
+    }
+    const link = node("a", "message-link", part.text);
+    link.href = part.href;
+    if (part.type === "url") {
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.title = "在新标签页打开 " + part.text;
+      link.onclick = () => {
+        if (
+          /MicroMessenger|QQ\/|DingTalk|Weibo|FBAN|FBAV|Instagram/i.test(
+            navigator.userAgent,
+          )
+        )
+          toast(
+            "若无法打开，请在右上角选择“在浏览器中打开”，或复制链接到浏览器。",
+          );
+      };
+    } else
+      link.title =
+        part.type === "email" ? "打开邮件应用" : "拨打电话（由系统确认）";
+    p.append(link);
+  }
+  return p;
+}
+let originalTrigger = null;
+function closeOriginal() {
+  $("image-viewer").hidden = true;
+  $("image-viewer-image").removeAttribute("src");
+  if (originalTrigger?.isConnected) originalTrigger.focus();
+  originalTrigger = null;
+}
+async function openOriginal(m, trigger) {
+  const token = state.token,
+    url = await ticket(m.file_id);
+  if (token !== state.token) return;
+  originalTrigger = trigger;
+  $("image-viewer-name").textContent = m.name;
+  $("image-viewer-image").alt = m.name;
+  $("image-viewer-image").src = url + "&inline=1";
+  $("image-viewer").hidden = false;
+  $("image-viewer-close").focus();
+}
+$("image-viewer-close").onclick = closeOriginal;
+$("image-viewer").onclick = (e) => {
+  if (e.target === $("image-viewer")) closeOriginal();
+};
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeOriginal();
+  else if (e.key === "Tab" && !$("image-viewer").hidden) {
+    e.preventDefault();
+    $("image-viewer-close").focus();
+  }
+});
+async function revealMessage(m) {
+  if (state.revealing.has(m.id)) return;
+  state.revealing.add(m.id);
+  const token = state.token;
+  try {
+    const result = await json("/api/messages/" + m.id + "/text");
+    if (token !== state.token) return;
+    if ((result.privacy_version ?? 0) !== (m.privacy_version ?? 0)) {
+      state.signature = "";
+      await refresh();
+      toast("隐私状态已更新，请重新点击。");
+      return;
+    }
+    state.revealed.set(m.id, {
+      text: result.text,
+      version: m.privacy_version ?? 0,
+    });
+    renderMessages();
+  } finally {
+    state.revealing.delete(m.id);
+  }
+}
+function privatePlaceholder(m) {
+  const b = button("", () => revealMessage(m), "private-message");
+  b.setAttribute("aria-label", "查看隐私消息");
+  b.append(
+    node(
+      "span",
+      m.file_id ? "image-placeholder" : "private-dots",
+      m.file_id ? (isImage(m) ? "▧" : "▤") : "••••••",
+    ),
+  );
+  b.append(
+    node("small", "message-filename", m.file_id ? m.name : "点击查看完整消息"),
+  );
+  return b;
+}
+async function togglePrivacy(m) {
+  const concealed = !m.concealed,
+    previous = state.privacyRevision,
+    token = state.token;
+  state.generation++;
+  state.polling = false;
+  const result = await json("/api/messages/" + m.id + "/privacy", {
+    method: "PUT",
+    body: JSON.stringify({ concealed }),
+  });
+  if (token !== state.token) return;
+  let text = "";
+  if (!concealed) text = (await json("/api/messages/" + m.id + "/text")).text;
+  if (token !== state.token) return;
+  for (const message of [...state.messages, ...state.older])
+    if (message.id === m.id)
+      Object.assign(message, {
+        concealed,
+        text,
+        privacy_version: result.privacy_version,
+      });
+  if (result.privacy_revision !== previous + 1) state.older = [];
+  state.privacyRevision = result.privacy_revision;
+  state.revealed.clear();
+  state.loadedImages.clear();
+  state.signature = "";
+  closeOriginal();
+  renderMessages();
+  await refresh();
+  toast(concealed ? "已设为隐私；已送达 TG 的副本不会撤回" : "已取消隐私");
+}
 async function loadPreview(element, m, attempt = 0) {
   const retry = () => {
     if (attempt < 4 && state.token) {
@@ -497,27 +638,43 @@ function renderMessages() {
         node("span", "expiry-badge", date(m.expires * 1000) + " 过期"),
       );
     const bubble = node("div", "bubble");
-    if (m.file_id) {
+    const hidden = m.concealed && !state.revealed.has(m.id);
+    if (hidden) {
+      bubble.append(privatePlaceholder(m));
+      bubble.onclick = (e) => {
+        if (e.target === bubble)
+          revealMessage(m).catch((err) => toast(err.message, true));
+      };
+    }
+    if (m.file_id && !hidden) {
       if (isImage(m)) {
         if (!state.autoLoadImages && !state.loadedImages.has(m.id)) {
-          bubble.append(
-            node("p", "muted", m.name + " · " + size(m.size)),
-            button(
-              "加载图片",
-              () => {
-                state.loadedImages.add(m.id);
-                renderMessages();
-              },
-              "secondary",
-            ),
+          const lazy = button(
+            "",
+            () => {
+              state.loadedImages.add(m.id);
+              renderMessages();
+            },
+            "private-message",
           );
+          lazy.setAttribute("aria-label", "加载图片");
+          lazy.append(
+            node("span", "image-placeholder", "▧"),
+            node("small", "message-filename", m.name),
+          );
+          bubble.append(lazy);
         } else {
           const image = node("img", "message-image");
           image.alt = m.name;
           image.loading = "lazy";
-          image.onclick = () =>
-            download(m).catch((e) => toast(e.message, true));
-          bubble.append(image);
+          const preview = button(
+            "",
+            () => openOriginal(m, preview),
+            "image-thumb",
+          );
+          preview.setAttribute("aria-label", "打开原图 " + m.name);
+          preview.append(image, node("small", "message-filename", m.name));
+          bubble.append(preview);
           loadPreview(image, m);
         }
       } else if (m.mime.startsWith("video/") || m.mime.startsWith("audio/")) {
@@ -543,34 +700,23 @@ function renderMessages() {
         bubble.append(card);
       }
     }
-    const text = m.concealed ? state.revealed.get(m.id) : m.text;
-    if (m.concealed && !state.revealed.has(m.id)) {
-      bubble.append(node("p", "concealed-text", "•••••• 正文已遮挡"));
-      bubble.append(
-        button(
-          "显示正文",
-          async () => {
-            const token = state.token;
-            const result = await json("/api/messages/" + m.id + "/text");
-            if (token !== state.token) return;
-            state.revealed.set(m.id, result.text);
-            renderMessages();
-          },
-          "secondary",
-        ),
-      );
-    } else if (text) bubble.append(node("p", "message-text", text));
+    const text = m.concealed ? state.revealed.get(m.id)?.text : m.text;
+    if (!hidden && text) bubble.append(renderText(text));
     const actions = node("div", "message-actions");
     if (text) actions.append(button("复制文字", () => copyText(text)));
+    actions.append(
+      button(m.concealed ? "取消隐私" : "设为隐私", () => togglePrivacy(m)),
+    );
     if (m.concealed && state.revealed.has(m.id))
       actions.append(
-        button("隐藏正文", () => {
+        button("收起", () => {
           state.revealed.delete(m.id);
           renderMessages();
         }),
       );
     if (m.file_id) {
-      if (isImage(m)) actions.append(button("复制图片", () => copyImage(m)));
+      if (isImage(m) && !hidden)
+        actions.append(button("复制图片", () => copyImage(m)));
       actions.append(button("下载 · " + size(m.size), () => download(m)));
     }
     actions.append(
@@ -672,11 +818,39 @@ async function refresh() {
     if (generation !== state.generation) return;
     state.maxMB = result.max_file_mb;
     state.autoLoadImages = result.auto_load_images !== false;
+    document.documentElement.dataset.messageSize = [
+      "small",
+      "medium",
+      "large",
+    ].includes(result.message_size)
+      ? result.message_size
+      : "medium";
+    const privacyRevision = result.privacy_revision ?? 0;
+    if (
+      state.privacyRevision !== null &&
+      state.privacyRevision !== privacyRevision
+    ) {
+      state.revealed.clear();
+      state.loadedImages.clear();
+      state.older = [];
+      state.hasMore = !!result.has_more;
+      closeOriginal();
+    }
+    state.privacyRevision = privacyRevision;
+    for (const m of result.messages) {
+      if (
+        state.revealed.has(m.id) &&
+        state.revealed.get(m.id).version !== (m.privacy_version ?? 0)
+      )
+        state.revealed.delete(m.id);
+    }
     if (!state.older.length) state.hasMore = !!result.has_more;
     const sig = JSON.stringify([
       result.messages,
       state.autoLoadImages,
       state.hasMore,
+      result.message_size,
+      privacyRevision,
     ]);
     if (sig !== state.signature) {
       state.messages = result.messages;
@@ -802,40 +976,17 @@ document.addEventListener("drop", (e) => {
   addFiles(e.dataTransfer.files);
   if (!["messages", "files"].includes(state.view)) setView("messages");
 });
-const emojis = [
-  "😀",
-  "😊",
-  "😂",
-  "🥹",
-  "🤔",
-  "👍",
-  "❤️",
-  "🎉",
-  "✨",
-  "🔥",
-  "✅",
-  "📌",
-  "📎",
-  "☀️",
-  "🌿",
-  "☕",
-  "🚀",
-  "👀",
-  "🙏",
-  "💡",
-];
-for (const emoji of emojis)
-  $("emoji-palette").append(
-    button(emoji, () => {
-      $("message-text").value += emoji;
-      $("emoji-palette").hidden = true;
-      $("message-text").focus();
-    }),
-  );
-$("emoji").onclick = () =>
-  ($("emoji-palette").hidden = !$("emoji-palette").hidden);
-$("retention").onchange = () =>
-  ($("custom-minutes").hidden = $("retention").value !== "custom");
+$("retention").onchange = () => {
+  const custom = $("retention").value === "custom";
+  $("custom-minutes").hidden = !custom;
+  $("composer").classList.toggle("custom-retention", custom);
+};
+function sizeComposer() {
+  const input = $("message-text");
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 96) + "px";
+}
+$("message-text").addEventListener("input", sizeComposer);
 function upload(file, text, ttl, concealed) {
   return new Promise((resolve, reject) => {
     const data = new FormData();
@@ -900,6 +1051,7 @@ async function send() {
         state.files.shift();
         text = "";
         $("message-text").value = "";
+        sizeComposer();
         renderAttachments();
       }
     } else {
@@ -913,6 +1065,7 @@ async function send() {
         }),
       });
       $("message-text").value = "";
+      sizeComposer();
     }
     state.signature = "";
     await refresh();
@@ -956,6 +1109,7 @@ async function loadTelegram() {
   $("tg-receive").checked = result.configured ? !!cfg.receive : true;
   $("tg-send").checked = result.configured ? !!cfg.send : true;
   $("tg-private").checked = !!cfg.include_concealed;
+  $("tg-receive-private").checked = cfg.receive_concealed !== false;
   $("tg-token").value = "";
   $("tg-token").placeholder = result.configured
     ? "Token 已加密保存；留空保持不变"
@@ -986,6 +1140,7 @@ $("telegram-form").onsubmit = async (event) => {
         receive: $("tg-receive").checked,
         send: $("tg-send").checked,
         include_concealed: $("tg-private").checked,
+        receive_concealed: $("tg-receive-private").checked,
         user_id: $("tg-user").value,
         chat_id: $("tg-chat").value.trim(),
         token: $("tg-token").value.trim(),
@@ -1056,6 +1211,7 @@ async function loadAdmin() {
   const s = state.admin.settings;
   $("public-registration").checked = s.public_registration;
   $("auto-load-images").checked = s.auto_load_images !== false;
+  $("message-size").value = s.message_size || "medium";
   $("guest-hours").value = s.guest_hours;
   const idle = s.session_idle_minutes ?? 15;
   $("idle-unit").value =
@@ -1125,6 +1281,7 @@ $("admin-form").onsubmit = async (e) => {
       body: JSON.stringify({
         public_registration: $("public-registration").checked,
         auto_load_images: $("auto-load-images").checked,
+        message_size: $("message-size").value,
         guest_hours: Number($("guest-hours").value),
         session_idle_minutes:
           $("idle-unit").value === "never"
@@ -1138,6 +1295,7 @@ $("admin-form").onsubmit = async (e) => {
       }),
     });
     browserSession.accept(state.token, await json("/api/session"));
+    document.documentElement.dataset.messageSize = $("message-size").value;
     toast("设置已保存");
   });
 };
@@ -1257,7 +1415,11 @@ $("restore-file").onchange = async () => {
   }
 };
 
-function expireSession(message = browserSession.remembered ? "记住的登录已到期，请重新验证" : "长时间无操作，请重新验证") {
+function expireSession(
+  message = browserSession.remembered
+    ? "记住的登录已到期，请重新验证"
+    : "长时间无操作，请重新验证",
+) {
   const token = state.token;
   if (!token) return;
   logoutLocal();

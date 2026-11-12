@@ -8,7 +8,7 @@ func migrateMessages(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	found := false
+	found, versionFound := false, false
 	for rows.Next() {
 		var cid, required, primary int
 		var name, kind string
@@ -20,6 +20,9 @@ func migrateMessages(db *sql.DB) error {
 		if name == "concealed" {
 			found = true
 		}
+		if name == "privacy_version" {
+			versionFound = true
+		}
 	}
 	err = rows.Err()
 	rows.Close() // Close before ALTER: the app deliberately uses one connection.
@@ -28,6 +31,9 @@ func migrateMessages(db *sql.DB) error {
 	}
 	if !found {
 		_, err = db.Exec(`ALTER TABLE messages ADD COLUMN concealed INTEGER NOT NULL DEFAULT 0`)
+	}
+	if err == nil && !versionFound {
+		_, err = db.Exec(`ALTER TABLE messages ADD COLUMN privacy_version INTEGER NOT NULL DEFAULT 0`)
 	}
 	return err
 }

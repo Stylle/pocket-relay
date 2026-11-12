@@ -13,6 +13,7 @@ const settings = {
   quota_mb: 5120,
   device_template: "{device} · {ip}",
   active_store: "local",
+  message_size: "medium",
 };
 async function settle() {
   for (let i = 0; i < 8; i++) await new Promise((r) => setImmediate(r));
@@ -27,6 +28,8 @@ function fixture(
     sessionToken = "",
     autoLoadImages = true,
     remembered = false,
+    revealText = "revealed test body",
+    messageSize = "medium",
   } = {},
 ) {
   const dom = new JSDOM(html, {
@@ -46,6 +49,7 @@ function fixture(
     chat_id: "",
   };
   let tgConfigured = false;
+  let privacyRevision = 0;
   w.Headers = Headers;
   w.performance.getEntriesByType = () => [{ type: navigation }];
   if (sessionToken)
@@ -59,8 +63,19 @@ function fixture(
     calls.push({ path, opts });
     let value;
     if (path === "/api/session/restore") {
-      if (!remembered) return new Response(JSON.stringify({error:"not remembered"}), {status:401});
-      value = {token:"remembered-memory-token",user,remembered:true,idle_minutes:0,expires_at:Date.now()+7*86400000,server_time:Date.now(),last_active:Date.now()};
+      if (!remembered)
+        return new Response(JSON.stringify({ error: "not remembered" }), {
+          status: 401,
+        });
+      value = {
+        token: "remembered-memory-token",
+        user,
+        remembered: true,
+        idle_minutes: 0,
+        expires_at: Date.now() + 7 * 86400000,
+        server_time: Date.now(),
+        last_active: Date.now(),
+      };
     } else if (path === "/api/status")
       value = {
         setup,
@@ -68,7 +83,12 @@ function fixture(
         guest_hours: 1,
       };
     else if (path === "/api/login" || path === "/api/enroll/confirm")
-      value = { token: "test-only-bearer", user, remembered: JSON.parse(opts.body).remember === true, idle_minutes: JSON.parse(opts.body).remember ? 0 : 15 };
+      value = {
+        token: "test-only-bearer",
+        user,
+        remembered: JSON.parse(opts.body).remember === true,
+        idle_minutes: JSON.parse(opts.body).remember ? 0 : 15,
+      };
     else if (path === "/api/session")
       value = {
         user,
@@ -83,8 +103,24 @@ function fixture(
         qr: "data:image/png;base64,AA==",
       };
     else if (/^\/api\/messages\/[^/]+\/text$/.test(path))
-      value = { text: "revealed test body" };
-    else if (path.startsWith("/api/messages"))
+      value = {
+        text: revealText,
+        privacy_version:
+          messages.find((m) => path.includes(m.id))?.privacy_version ?? 0,
+      };
+    else if (path.endsWith("/privacy") && opts.method === "PUT") {
+      const m = messages.find(
+        (m) => path === "/api/messages/" + m.id + "/privacy",
+      );
+      m.concealed = JSON.parse(opts.body).concealed;
+      m.privacy_version = (m.privacy_version ?? 0) + 1;
+      privacyRevision++;
+      value = {
+        ok: true,
+        privacy_version: m.privacy_version,
+        privacy_revision: privacyRevision,
+      };
+    } else if (path.startsWith("/api/messages"))
       value =
         opts.method === "POST"
           ? { id: "new-message" }
@@ -94,7 +130,11 @@ function fixture(
               device_template: "{device} · {ip}",
               max_file_mb: 256,
               auto_load_images: autoLoadImages,
+              message_size: messageSize,
+              privacy_revision: privacyRevision,
             };
+    else if (/^\/api\/files\/[^/]+\/ticket$/.test(path))
+      value = { url: "/file/test?ticket=test-only" };
     else if (path === "/api/admin/telegram") {
       if (opts.method === "PUT") {
         const body = JSON.parse(opts.body);
@@ -128,6 +168,7 @@ function fixture(
     });
   };
   w.eval(fs.readFileSync("web/session.js", "utf8"));
+  w.eval(fs.readFileSync("web/message-text.js", "utf8"));
   w.eval(
     script +
       "\nwindow.__test={state,setView,renderAttachments,browserSession,recordActivity,flushActivity,expireSession};",
@@ -192,17 +233,22 @@ test("remember checkbox is opt-in and remembered cookie restores a freshly opene
   assert.equal(ordinary.$("remember-login").checked, false);
   ordinary.$("remember-login").checked = true;
   await login(ordinary);
-  const call = ordinary.calls.find(c => c.path === "/api/login");
+  const call = ordinary.calls.find((c) => c.path === "/api/login");
   assert.equal(JSON.parse(call.opts.body).remember, true);
   assert.equal(ordinary.w.__test.browserSession.remembered, true);
   const restored = fixture(t, { navigation: "navigate", remembered: true });
   await settle();
   assert.equal(restored.$("workspace").hidden, false);
   assert.equal(restored.w.__test.browserSession.remembered, true);
-  const restoreCall = restored.calls.find(c => c.path === "/api/session/restore");
+  const restoreCall = restored.calls.find(
+    (c) => c.path === "/api/session/restore",
+  );
   assert.equal(restoreCall.opts.method, "POST");
   assert.equal(restoreCall.opts.headers.get("X-Relay-Session"), "1");
-  assert.equal(restored.calls.some(c => c.path === "/api/login"), false);
+  assert.equal(
+    restored.calls.some((c) => c.path === "/api/login"),
+    false,
+  );
   assert.equal(restored.w.localStorage.getItem("pr-session"), null);
   const event = new restored.w.Event("pageshow");
   Object.defineProperty(event, "persisted", { value: true });
@@ -440,13 +486,13 @@ test("concealed text loads only on reveal and is concealed again after a page re
   const f = fixture(t, { messages });
   await settle();
   await login(f);
-  assert.match(f.$("timeline").textContent, /正文已遮挡/);
+  assert.match(f.$("timeline").textContent, /点击查看完整消息/);
   assert.equal(
     f.calls.some((c) => c.path.endsWith("/text")),
     false,
   );
   [...f.$("timeline").querySelectorAll("button")]
-    .find((b) => b.textContent === "显示正文")
+    .find((b) => b.getAttribute("aria-label") === "查看隐私消息")
     .click();
   await settle();
   assert.match(f.$("timeline").textContent, /revealed test body/);
@@ -461,7 +507,7 @@ test("concealed text loads only on reveal and is concealed again after a page re
   });
   await settle();
   assert.doesNotMatch(fresh.$("timeline").textContent, /revealed test body/);
-  assert.match(fresh.$("timeline").textContent, /正文已遮挡/);
+  assert.match(fresh.$("timeline").textContent, /点击查看完整消息/);
   f.$("concealed-send").checked = true;
   f.$("message-text").value = "masked";
   f.$("send").click();
@@ -501,7 +547,7 @@ test("disabled automatic images do not request tickets until an explicit load", 
     false,
   );
   [...f.$("timeline").querySelectorAll("button")]
-    .find((b) => b.textContent === "加载图片")
+    .find((b) => b.getAttribute("aria-label") === "加载图片")
     .click();
   await settle();
   assert.equal(f.$("timeline").querySelectorAll("img").length, 1);
@@ -509,4 +555,159 @@ test("disabled automatic images do not request tickets until an explicit load", 
     f.calls.some((c) => c.path.includes("/ticket")),
     true,
   );
+});
+
+test("links are semantic safe anchors and concealed links only appear after tapping the message", async (t) => {
+  const text =
+    "https://example.com alice@example.com 13800138000 <img src=x onerror=alert(1)> javascript:alert(1)";
+  const f = fixture(t, {
+    messages: [
+      {
+        id: "link-private",
+        device: "test",
+        text: "",
+        concealed: true,
+        created: Date.now(),
+        expires: 0,
+        file_id: "",
+      },
+    ],
+    revealText: text,
+  });
+  await settle();
+  await login(f);
+  assert.equal(f.$("timeline").querySelectorAll("a").length, 0);
+  f.$("timeline").querySelector('[aria-label="查看隐私消息"]').click();
+  await settle();
+  const links = f.$("timeline").querySelectorAll(".message-link");
+  assert.equal(links.length, 3);
+  assert.equal(links[0].target, "_blank");
+  assert.match(links[0].rel, /noopener/);
+  assert.match(links[0].rel, /noreferrer/);
+  assert.equal(links[1].getAttribute("href"), "mailto:alice@example.com");
+  assert.equal(links[2].getAttribute("href"), "tel:13800138000");
+  assert.equal(f.$("timeline").querySelector("img"), null);
+  assert.equal(
+    f.$("timeline").querySelector(".message-text").textContent,
+    text,
+  );
+  [...f.$("timeline").querySelectorAll("button")]
+    .find((b) => b.textContent === "收起")
+    .click();
+  assert.equal(f.$("timeline").querySelectorAll("a").length, 0);
+});
+
+test("private image placeholder requests no ticket until reveal; thumbnail opens an original and closes cleanly", async (t) => {
+  const f = fixture(t, {
+    messages: [
+      {
+        id: "private-picture",
+        device: "test",
+        text: "",
+        concealed: true,
+        created: Date.now(),
+        expires: 0,
+        file_id: "picture",
+        name: "photo.png",
+        mime: "image/png",
+        size: 10,
+      },
+    ],
+    revealText: "",
+  });
+  await settle();
+  await login(f);
+  assert.equal(f.$("timeline").querySelector("img"), null);
+  assert.equal(
+    f.calls.some((c) => c.path.includes("/ticket")),
+    false,
+  );
+  assert.match(f.$("timeline").textContent, /photo.png/);
+  f.$("timeline").querySelector('[aria-label="查看隐私消息"]').click();
+  await settle();
+  assert.ok(f.$("timeline").querySelector(".message-image"));
+  f.$("timeline").querySelector(".image-thumb").click();
+  await settle();
+  assert.equal(f.$("image-viewer").hidden, false);
+  assert.match(f.$("image-viewer-image").getAttribute("src"), /inline=1/);
+  f.$("image-viewer-close").click();
+  assert.equal(f.$("image-viewer").hidden, true);
+  assert.equal(f.$("image-viewer-image").getAttribute("src"), null);
+});
+
+test("privacy can be changed after sending and shared font size applies without storing message contents", async (t) => {
+  const f = fixture(t, {
+    messageSize: "small",
+    messages: [
+      {
+        id: "toggle",
+        device: "test",
+        text: "normal@example.com",
+        concealed: false,
+        created: Date.now(),
+        expires: 0,
+        file_id: "",
+      },
+    ],
+  });
+  await settle();
+  await login(f);
+  assert.equal(f.w.document.documentElement.dataset.messageSize, "small");
+  assert.equal(f.$("timeline").querySelectorAll("a").length, 1);
+  [...f.$("timeline").querySelectorAll("button")]
+    .find((b) => b.textContent === "设为隐私")
+    .click();
+  await settle();
+  assert.equal(f.$("timeline").querySelectorAll("a").length, 0);
+  assert.ok(f.$("timeline").querySelector('[aria-label="查看隐私消息"]'));
+  const put = f.calls.find((c) => c.path.endsWith("/privacy"));
+  assert.deepEqual(JSON.parse(put.opts.body), { concealed: true });
+  [...f.$("timeline").querySelectorAll("button")]
+    .find((b) => b.textContent === "取消隐私")
+    .click();
+  await settle();
+  assert.equal(
+    f.$("timeline").querySelector('[aria-label="查看隐私消息"]'),
+    null,
+  );
+  await f.w.__test.setView("admin");
+  f.$("message-size").value = "large";
+  f.$("admin-form").dispatchEvent(
+    new f.w.SubmitEvent("submit", {
+      cancelable: true,
+      submitter: f.$("admin-form").querySelector("button.primary"),
+    }),
+  );
+  await settle();
+  const save = f.calls.findLast(
+    (c) => c.path === "/api/admin" && c.opts.method === "PUT",
+  );
+  assert.equal(JSON.parse(save.opts.body).message_size, "large");
+  assert.equal(f.w.document.documentElement.dataset.messageSize, "large");
+  assert.equal(f.$("emoji"), null);
+  assert.equal(f.$("message-text").rows, 1);
+});
+
+test("video remains preload none and never autoplays", async (t) => {
+  const f = fixture(t, {
+    messages: [
+      {
+        id: "video",
+        device: "test",
+        text: "",
+        created: Date.now(),
+        expires: 0,
+        file_id: "video",
+        name: "video.mp4",
+        mime: "video/mp4",
+        size: 10,
+      },
+    ],
+  });
+  await settle();
+  await login(f);
+  const video = f.$("timeline").querySelector("video");
+  assert.equal(video.preload, "none");
+  assert.equal(video.autoplay, false);
+  assert.equal(video.controls, true);
 });

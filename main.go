@@ -28,6 +28,8 @@ import (
 //go:embed web/*
 var assets embed.FS
 
+const version = "0.4.0"
+
 type user struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
@@ -83,6 +85,7 @@ type settings struct {
 	ActiveStore        string `json:"active_store"`
 	SessionIdleMinutes int    `json:"session_idle_minutes"`
 	AutoLoadImages     bool   `json:"auto_load_images"`
+	MessageSize        string `json:"message_size"`
 }
 
 func randomID() string {
@@ -138,6 +141,7 @@ func openApp(dir string) (*app, error) {
  CREATE INDEX IF NOT EXISTS telegram_ready ON telegram_outbox(failed,available);`
 	schema += `CREATE TABLE IF NOT EXISTS remembered_sessions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,created INTEGER NOT NULL,expires INTEGER NOT NULL);
  CREATE INDEX IF NOT EXISTS remembered_user ON remembered_sessions(user_id,created);`
+	schema += `CREATE TABLE IF NOT EXISTS message_privacy_state(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,revision INTEGER NOT NULL DEFAULT 0);`
 	if _, e = db.Exec(schema); e != nil {
 		db.Close()
 		return nil, e
@@ -152,7 +156,7 @@ func openApp(dir string) (*app, error) {
 		db.Close()
 		return nil, e
 	}
-	defaults, _ := json.Marshal(settings{GuestHours: 1, MaxMB: 256, QuotaMB: 5120, DeviceTemplate: "{device} · {ip}", ActiveStore: "local", SessionIdleMinutes: 15, AutoLoadImages: true})
+	defaults, _ := json.Marshal(settings{GuestHours: 1, MaxMB: 256, QuotaMB: 5120, DeviceTemplate: "{device} · {ip}", ActiveStore: "local", SessionIdleMinutes: 15, AutoLoadImages: true, MessageSize: "medium"})
 	if _, e = db.Exec(`INSERT OR IGNORE INTO config(id,value) VALUES(1,?)`, string(defaults)); e != nil {
 		db.Close()
 		return nil, e
@@ -171,7 +175,7 @@ func (a *app) config() settings {
 	if e := a.db.QueryRow(`SELECT value FROM config WHERE id=1`).Scan(&b); e != nil {
 		panic(e)
 	}
-	s := settings{SessionIdleMinutes: 15, AutoLoadImages: true}
+	s := settings{SessionIdleMinutes: 15, AutoLoadImages: true, MessageSize: "medium"}
 	if e := json.Unmarshal([]byte(b), &s); e != nil {
 		panic(e)
 	}
@@ -275,6 +279,7 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("GET /api/messages", a.listMessages)
 	mux.HandleFunc("POST /api/messages", a.sendMessage)
 	mux.HandleFunc("GET /api/messages/{id}/text", a.messageText)
+	mux.HandleFunc("PUT /api/messages/{id}/privacy", a.messagePrivacy)
 	mux.HandleFunc("DELETE /api/messages/{id}", a.deleteMessage)
 	mux.HandleFunc("POST /api/files/{id}/ticket", a.fileTicket)
 	mux.HandleFunc("GET /file/{id}", a.download)

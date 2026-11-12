@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -17,16 +18,17 @@ import (
 )
 
 type message struct {
-	Concealed bool   `json:"concealed"`
-	ID        string `json:"id"`
-	Device    string `json:"device"`
-	Text      string `json:"text"`
-	Created   int64  `json:"created"`
-	Expires   int64  `json:"expires"`
-	FileID    string `json:"file_id"`
-	Name      string `json:"name"`
-	MIME      string `json:"mime"`
-	Size      int64  `json:"size"`
+	PrivacyVersion int64  `json:"privacy_version"`
+	Concealed      bool   `json:"concealed"`
+	ID             string `json:"id"`
+	Device         string `json:"device"`
+	Text           string `json:"text"`
+	Created        int64  `json:"created"`
+	Expires        int64  `json:"expires"`
+	FileID         string `json:"file_id"`
+	Name           string `json:"name"`
+	MIME           string `json:"mime"`
+	Size           int64  `json:"size"`
 }
 
 func (a *app) listMessages(w http.ResponseWriter, r *http.Request) {
@@ -79,9 +81,16 @@ func (a *app) listMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filesOnly := q.Get("files") == "1"
+	config := a.config()
+	tx, e := a.db.BeginTx(r.Context(), &sql.TxOptions{ReadOnly: true})
+	if e != nil {
+		fail(w, 500, "读取消息失败")
+		return
+	}
+	defer tx.Rollback()
 	// instr is a literal substring match: %, _ and SQL syntax are not wildcards.
 	// Search runs against the database, not just the most recent page in memory.
-	rows, e := a.db.Query(`SELECT m.id,m.device,CASE WHEN m.concealed=1 THEN '' ELSE m.text END,m.created,m.expires,m.file_id,COALESCE(f.name,''),COALESCE(f.mime,''),COALESCE(f.size,0),m.concealed FROM messages m LEFT JOIN files f ON f.id=m.file_id WHERE m.user_id=? AND (m.expires=0 OR m.expires>?) AND m.created>=? AND m.created<? AND instr(lower(m.text),lower(?))>0 AND (?=0 OR m.file_id!='') AND (m.created<? OR (m.created=? AND m.id<?)) ORDER BY m.created DESC,m.id DESC LIMIT 101`, u.ID, now(), from, to, text, filesOnly, before, before, beforeID)
+	rows, e := tx.Query(`SELECT m.id,m.device,CASE WHEN m.concealed=1 THEN '' ELSE m.text END,m.created,m.expires,m.file_id,COALESCE(f.name,''),COALESCE(f.mime,''),COALESCE(f.size,0),m.concealed,m.privacy_version FROM messages m LEFT JOIN files f ON f.id=m.file_id WHERE m.user_id=? AND (m.expires=0 OR m.expires>?) AND m.created>=? AND m.created<? AND instr(lower(m.text),lower(?))>0 AND (?=0 OR m.file_id!='') AND (m.created<? OR (m.created=? AND m.id<?)) ORDER BY m.created DESC,m.id DESC LIMIT 101`, u.ID, now(), from, to, text, filesOnly, before, before, beforeID)
 	if e != nil {
 		fail(w, 500, "读取消息失败")
 		return
@@ -89,7 +98,7 @@ func (a *app) listMessages(w http.ResponseWriter, r *http.Request) {
 	out := []message{}
 	for rows.Next() {
 		var m message
-		if e = rows.Scan(&m.ID, &m.Device, &m.Text, &m.Created, &m.Expires, &m.FileID, &m.Name, &m.MIME, &m.Size, &m.Concealed); e != nil {
+		if e = rows.Scan(&m.ID, &m.Device, &m.Text, &m.Created, &m.Expires, &m.FileID, &m.Name, &m.MIME, &m.Size, &m.Concealed, &m.PrivacyVersion); e != nil {
 			rows.Close()
 			fail(w, 500, "读取消息失败")
 			return
@@ -106,8 +115,17 @@ func (a *app) listMessages(w http.ResponseWriter, r *http.Request) {
 	if hasMore {
 		out = out[:100]
 	}
-	config := a.config()
-	payload, e := json.Marshal(map[string]any{"messages": out, "has_more": hasMore, "auto_load_images": config.AutoLoadImages, "user": u, "device_template": config.DeviceTemplate, "max_file_mb": config.MaxMB})
+	var privacyRevision int64
+	e = tx.QueryRow(`SELECT revision FROM message_privacy_state WHERE user_id=?`, u.ID).Scan(&privacyRevision)
+	if e != nil && e != sql.ErrNoRows {
+		fail(w, 500, "读取隐私状态失败")
+		return
+	}
+	if e = tx.Commit(); e != nil {
+		fail(w, 500, "读取消息失败")
+		return
+	}
+	payload, e := json.Marshal(map[string]any{"messages": out, "has_more": hasMore, "auto_load_images": config.AutoLoadImages, "message_size": config.MessageSize, "privacy_revision": privacyRevision, "user": u, "device_template": config.DeviceTemplate, "max_file_mb": config.MaxMB})
 	if e != nil {
 		fail(w, 500, "读取消息失败")
 		return
@@ -131,11 +149,82 @@ func (a *app) messageText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var text string
-	if err := a.db.QueryRow(`SELECT text FROM messages WHERE id=? AND user_id=? AND (expires=0 OR expires>?)`, r.PathValue("id"), u.ID, now()).Scan(&text); err != nil {
+	var version int64
+	if err := a.db.QueryRow(`SELECT text,privacy_version FROM messages WHERE id=? AND user_id=? AND (expires=0 OR expires>?)`, r.PathValue("id"), u.ID, now()).Scan(&text, &version); err != nil {
 		fail(w, 404, "消息不存在或已过期")
 		return
 	}
-	reply(w, 200, map[string]string{"text": text})
+	reply(w, 200, map[string]any{"text": text, "privacy_version": version})
+}
+
+func (a *app) messagePrivacy(w http.ResponseWriter, r *http.Request) {
+	u, ok := a.auth(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Concealed *bool `json:"concealed"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if in.Concealed == nil {
+		fail(w, 400, "请选择隐私状态")
+		return
+	}
+	a.gate.RLock()
+	defer a.gate.RUnlock()
+	tx, err := a.db.Begin()
+	if err != nil {
+		fail(w, 500, "保存失败")
+		return
+	}
+	defer tx.Rollback()
+	var file string
+	var version, revision int64
+	err = tx.QueryRow(`UPDATE messages SET concealed=?,privacy_version=privacy_version+1 WHERE id=? AND user_id=? AND (expires=0 OR expires>?) RETURNING file_id,privacy_version`, *in.Concealed, r.PathValue("id"), u.ID, now()).Scan(&file, &version)
+	if err == sql.ErrNoRows {
+		fail(w, 404, "消息不存在或已过期")
+		return
+	}
+	if err != nil {
+		fail(w, 500, "保存失败")
+		return
+	}
+	// Changing display privacy must not silently publish an old queued message.
+	if *in.Concealed {
+		if _, err = tx.Exec(`DELETE FROM telegram_outbox WHERE message_id=?`, r.PathValue("id")); err != nil {
+			fail(w, 500, "保存失败")
+			return
+		}
+	}
+	if _, err = tx.Exec(`INSERT INTO message_privacy_state(user_id,revision) VALUES(?,1) ON CONFLICT(user_id) DO UPDATE SET revision=revision+1`, u.ID); err != nil {
+		fail(w, 500, "保存失败")
+		return
+	}
+	if err = tx.QueryRow(`SELECT revision FROM message_privacy_state WHERE user_id=?`, u.ID).Scan(&revision); err != nil {
+		fail(w, 500, "保存失败")
+		return
+	}
+	if err = tx.Commit(); err != nil {
+		fail(w, 500, "保存失败")
+		return
+	}
+	if *in.Concealed && file != "" {
+		a.mu.Lock()
+		for id, t := range a.tickets {
+			if t.User == u.ID && t.File == file {
+				delete(a.tickets, id)
+			}
+		}
+		a.mu.Unlock()
+	}
+	if *in.Concealed {
+		if cfg, _, err := a.telegramConfig(); err == nil && cfg.Enabled && cfg.Send && cfg.UserID == u.ID {
+			a.wakeTelegram()
+		}
+	}
+	reply(w, 200, map[string]any{"ok": true, "privacy_version": version, "privacy_revision": revision, "concealed": *in.Concealed})
 }
 func expiry(ttl int64) (int64, error) {
 	if ttl == 0 {
@@ -348,7 +437,7 @@ func (a *app) sendMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	id := randomID()
-	_, e = tx.Exec(`INSERT INTO messages(id,user_id,device,text,created,expires,file_id,concealed) VALUES(?,?,?,?,?,?,?,?)`, id, u.ID, a.deviceTemplate(s, r, device), text, time.Now().UnixMilli(), expires, fileID, concealed && text != "")
+	_, e = tx.Exec(`INSERT INTO messages(id,user_id,device,text,created,expires,file_id,concealed) VALUES(?,?,?,?,?,?,?,?)`, id, u.ID, a.deviceTemplate(s, r, device), text, time.Now().UnixMilli(), expires, fileID, concealed)
 	if e != nil {
 		fail(w, 500, "保存失败")
 		return

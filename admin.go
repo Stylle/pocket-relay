@@ -14,13 +14,16 @@ func (a *app) configTxSettings(tx *sql.Tx) settings {
 	if e := tx.QueryRow(`SELECT value FROM config WHERE id=1`).Scan(&raw); e != nil {
 		panic(e)
 	}
-	s := settings{SessionIdleMinutes: 15, AutoLoadImages: true}
+	s := settings{SessionIdleMinutes: 15, AutoLoadImages: true, MessageSize: "medium"}
 	if e := json.Unmarshal([]byte(raw), &s); e != nil {
 		panic(e)
 	}
 	return s
 }
 func validateSettings(s settings) bool {
+	if s.MessageSize != "" && s.MessageSize != "small" && s.MessageSize != "medium" && s.MessageSize != "large" {
+		return false
+	}
 	return s.SessionIdleMinutes >= 0 && s.SessionIdleMinutes <= 5256000 && s.GuestHours >= 1 && s.GuestHours <= 8760 && s.MaxMB >= 1 && s.MaxMB <= 10240 && s.QuotaMB >= s.MaxMB && s.QuotaMB <= 1048576 && len(s.DeviceTemplate) > 0 && len(s.DeviceTemplate) < 200 && strings.Contains(s.DeviceTemplate, "{device}")
 }
 func (a *app) adminGet(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +73,7 @@ func (a *app) adminSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	current := a.config()
-	s := settings{SessionIdleMinutes: current.SessionIdleMinutes, AutoLoadImages: current.AutoLoadImages}
+	s := settings{SessionIdleMinutes: current.SessionIdleMinutes, AutoLoadImages: current.AutoLoadImages, MessageSize: current.MessageSize}
 	previousIdle := s.SessionIdleMinutes
 	if !decode(w, r, &s) {
 		return

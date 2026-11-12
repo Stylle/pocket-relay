@@ -26,6 +26,7 @@ type telegramConfig struct {
 	Receive          bool   `json:"receive"`
 	Send             bool   `json:"send"`
 	IncludeConcealed bool   `json:"include_concealed"`
+	ReceiveConcealed bool   `json:"receive_concealed"`
 	UserID           string `json:"user_id"`
 	ChatID           string `json:"chat_id"`
 	Token            string `json:"token"`
@@ -33,7 +34,7 @@ type telegramConfig struct {
 }
 
 func (a *app) telegramConfig() (telegramConfig, string, error) {
-	var cfg telegramConfig
+	cfg := telegramConfig{ReceiveConcealed: true}
 	var encoded, revision string
 	err := a.db.QueryRow(`SELECT value,revision FROM telegram WHERE id=1`).Scan(&encoded, &revision)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -81,6 +82,7 @@ type telegramInput struct {
 	Receive          bool   `json:"receive"`
 	Send             bool   `json:"send"`
 	IncludeConcealed bool   `json:"include_concealed"`
+	ReceiveConcealed *bool  `json:"receive_concealed"`
 	UserID           string `json:"user_id"`
 	ChatID           string `json:"chat_id"`
 	Token            string `json:"token"`
@@ -135,6 +137,10 @@ func (a *app) telegramSave(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	cfg := telegramConfig{Enabled: in.Enabled, Receive: in.Receive, Send: in.Send, IncludeConcealed: in.IncludeConcealed, UserID: in.UserID, ChatID: in.ChatID, Token: in.Token, Since: previous.Since}
+	cfg.ReceiveConcealed = previous.ReceiveConcealed
+	if in.ReceiveConcealed != nil {
+		cfg.ReceiveConcealed = *in.ReceiveConcealed
+	}
 	if in.Enabled && (!previous.Enabled || !previous.Receive && in.Receive || previous.Token != in.Token || previous.ChatID != in.ChatID || previous.UserID != in.UserID) {
 		cfg.Since = now()
 	}
@@ -677,7 +683,7 @@ func (a *app) importTelegram(ctx context.Context, cfg telegramConfig, rev string
 	if used+size > settings.QuotaMB<<20 {
 		return errors.New("归属账户存储空间不足，请清理后等待重试")
 	}
-	if _, err = tx.Exec(`INSERT INTO messages(id,user_id,device,text,created,expires,file_id) VALUES(?,?,'Telegram',?,?,0,?)`, randomID(), cfg.UserID, text, time.Now().UnixMilli(), fileID); err != nil {
+	if _, err = tx.Exec(`INSERT INTO messages(id,user_id,device,text,created,expires,file_id,concealed) VALUES(?,?,'Telegram',?,?,0,?,?)`, randomID(), cfg.UserID, text, time.Now().UnixMilli(), fileID, cfg.ReceiveConcealed); err != nil {
 		return errors.New("接收消息保存失败")
 	}
 	if fileID != "" {

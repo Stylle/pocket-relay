@@ -12,6 +12,7 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
     <script src="/session.js" defer></script>
+    <script src="/message-text.js" defer></script>
     <script src="/app.js" defer></script>
   </head>
   <body>
@@ -82,8 +83,14 @@
                 required
             /></label>
             <p id="auth-error" class="error" role="alert"></p>
-            <label class="check"><input id="remember-login" type="checkbox" />记住登录状态（7 天）</label>
-            <p class="small muted">仅在自己的设备勾选。7 天内重新打开网页无需验证，主动退出立即失效；临时账户到期仍需重新验证。</p>
+            <label class="check"
+              ><input id="remember-login" type="checkbox" />记住登录状态（7
+              天）</label
+            >
+            <p class="small muted">
+              仅在自己的设备勾选。7
+              天内重新打开网页无需验证，主动退出立即失效；临时账户到期仍需重新验证。
+            </p>
             <button id="auth-submit" class="primary wide" type="submit">
               进入我的空间 <span>→</span>
             </button>
@@ -225,7 +232,8 @@
           <div class="settings-card">
             <h3>关于隐私与复制</h3>
             <p>
-              勾选「记住登录状态」后固定 7 天内免验证，支持重新打开浏览器和服务重启；不勾选时，同一标签页刷新保留登录，其他情况与后台空闲超时规则保持不变。主动退出撤销当前浏览器的记住状态。
+              勾选「记住登录状态」后固定 7
+              天内免验证，支持重新打开浏览器和服务重启；不勾选时，同一标签页刷新保留登录，其他情况与后台空闲超时规则保持不变。主动退出撤销当前浏览器的记住状态。
             </p>
             <p>
               浏览器复制图片、剪贴板粘贴需要 HTTPS 或
@@ -293,7 +301,8 @@
             </div>
             <p class="muted small">
               默认 15
-              分钟；后台同步不算操作。此策略仅作用于未勾选「记住登录状态」的会话。勾选后固定 7 天有效，不受空闲超时影响；主动退出或临时账户到期仍立即失效。
+              分钟；后台同步不算操作。此策略仅作用于未勾选「记住登录状态」的会话。勾选后固定
+              7 天有效，不受空闲超时影响；主动退出或临时账户到期仍立即失效。
             </p>
             <label
               >消息来源显示模板<input
@@ -313,7 +322,17 @@
               />默认加载消息图片</label
             >
             <p class="muted small">
-              关闭后只显示文件名，点击“加载图片”才请求图片；不影响手动下载与复制。
+              关闭后显示小占位图与文件名，点击后才加载缩略图；隐私图片始终先隐藏，不影响手动下载。
+            </p>
+            <label
+              >消息字号<select id="message-size">
+                <option value="small">小</option>
+                <option value="medium">中（默认）</option>
+                <option value="large">大</option>
+              </select></label
+            >
+            <p class="muted small">
+              保存到后台，所有设备沿用；不影响复制的原文。
             </p>
             <button class="primary">保存设置</button>
           </form>
@@ -355,6 +374,10 @@
             <label class="check"
               ><input id="tg-receive" type="checkbox" checked />接收 TG
               消息到网站</label
+            >
+            <label class="check"
+              ><input id="tg-receive-private" type="checkbox" checked />收到的
+              TG 消息默认设为隐私（含图片与附件）</label
             >
             <label class="check"
               ><input id="tg-send" type="checkbox" checked />网站新消息发送到
@@ -473,7 +496,7 @@
           <div class="composer-inner">
             <textarea
               id="message-text"
-              rows="2"
+              rows="1"
               placeholder="发给未来几秒后的自己…"
               maxlength="16384"
               aria-label="消息内容"
@@ -482,11 +505,8 @@
               <div class="composer-tools">
                 <label
                   class="check privacy-option"
-                  title="只遮挡文字正文，不加密附件或实现端到端加密；刷新后重新遮挡"
-                  ><input
-                    id="concealed-send"
-                    type="checkbox"
-                  />隐私发送（遮挡正文）</label
+                  title="点击消息展开正文和附件预览，刷新后重新隐藏；不是端到端加密"
+                  ><input id="concealed-send" type="checkbox" />隐私</label
                 >
                 <button
                   id="attach"
@@ -495,14 +515,8 @@
                   aria-label="添加文件"
                 >
                   ＋</button
-                ><input id="file-input" type="file" multiple hidden /><button
-                  id="emoji"
-                  class="icon-button"
-                  title="添加表情"
-                  aria-label="添加表情"
-                >
-                  ☺</button
-                ><label class="retention"
+                ><input id="file-input" type="file" multiple hidden /><label
+                  class="retention"
                   ><span>◷</span
                   ><select id="retention" aria-label="消息保存时间">
                     <option value="0">永久保存</option>
@@ -526,7 +540,6 @@
                 发送 <span>↗</span>
               </button>
             </div>
-            <div id="emoji-palette" class="emoji-palette" hidden></div>
           </div>
           <div class="composer-foot">
             <span id="upload-progress"
@@ -534,6 +547,24 @@
             ><span id="sending-device"></span>
           </div>
         </footer>
+        <div
+          id="image-viewer"
+          class="image-viewer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="原图预览"
+          hidden
+        >
+          <button
+            id="image-viewer-close"
+            class="image-viewer-close"
+            type="button"
+            aria-label="关闭原图"
+          >
+            ×</button
+          ><img id="image-viewer-image" alt="原图" />
+          <p id="image-viewer-name"></p>
+        </div>
       </section>
       <div id="drop-overlay" class="drop-overlay" hidden>
         <span>＋</span>
