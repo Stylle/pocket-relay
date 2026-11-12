@@ -1,0 +1,17 @@
+# 飞牛 / 通用 NAS：可直接上传此文件或复制到 Compose 项目中。
+# 私密镜像需先在 NAS 上登录 ghcr.io，不能匿名拉取。
+services:
+  pocket-relay:
+    image: ghcr.io/stylle/pocket-relay:latest # 必填；GitHub Token 不要写在此文件中
+    container_name: pocket-relay             # 可省略，也可改名
+    restart: always                         # 建议保留，恢复备份时需要重启
+    ports:
+      - "28182:8080"                        # 左侧为 NAS 访问端口，可改；右侧不改
+    volumes:
+      - relay-data:/data                    # 必须保留；数据由 Docker 命名卷保存
+
+volumes:
+  relay-data:                               # 必填，与上面的卷名一致
+
+# 不需要 environment 或 .env；第一次打开网页绑定验证器。
+# 请保留数据卷；删除卷会删除账户、密钥、配置和本地附件。

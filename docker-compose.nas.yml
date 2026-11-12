@@ -1,0 +1,13 @@
+# 可选：飞牛 / 通用 NAS 指定宿主机数据文件夹。
+# 私密镜像需先登录 ghcr.io。默认优先用 docker-compose.yml，省去文件夹权限配置。
+services:
+  pocket-relay:
+    image: ghcr.io/stylle/pocket-relay:latest # 必填，不能用尚未发布的 Docker Hub 地址
+    container_name: pocket-relay             # 可省略，也可改名
+    restart: always                         # 建议保留，恢复备份时需要重启
+    ports:
+      - "28182:8080"                        # 左侧为 NAS 端口，可改；右侧不改
+    volumes:
+      # 必须修改左侧为实际专用目录，并提前允许 UID/GID 10001:10001 读写。
+      # 右侧 /data 必须保留。没有任何必填环境变量，不识别 PUID/PGID。
+      - /srv/pocket_relay/data:/data

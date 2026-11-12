@@ -2,23 +2,77 @@
 
 一个只给自己发消息的轻量网页。电脑发，手机取；支持文字、表情、图片、动图、视频和任意文件。
 
-## 部署
+## 飞牛 / 其他 NAS：最简 Compose 部署
 
-```bash
-docker compose up -d
+**当前镜像：`ghcr.io/stylle/pocket-relay:latest`，支持 amd64 / arm64。镜像为私密，需要先登录 GHCR，不能匿名拉取。Docker Hub 暂未发布，不要使用 `stylle/pocket-relay:latest` 部署。**
+
+1. 在 NAS 的镜像仓库认证中登录 `ghcr.io`；账号是 GitHub 用户名，密码是具有 `read:packages` 权限且能访问本镜像的 GitHub Token。也可通过 NAS 的 SSH 终端执行 `docker login ghcr.io`，按提示输入。不要把 Token 写入 Compose。
+2. 在 NAS 的 Docker / Compose 管理界面新建项目，粘贴下面的 YAML 并启动。不同 NAS 的入口名称可能不同；如果要求上传文件，使用 [docker-compose.yml](docker-compose.yml)。**纯镜像部署，不需要下载源码或设置构建目录。**
+3. 打开 `http://NAS的IP:28182`，填写账户名并绑定验证器。**第一次初始化在可信内网完成，第一个完成绑定的账户为永久管理员。**
+
+```yaml
+services:
+  pocket-relay:
+    image: ghcr.io/stylle/pocket-relay:latest # 必须保留；先登录私密镜像仓库
+    container_name: pocket-relay             # 可省略，也可改名
+    restart: always                         # 建议保留，恢复备份时需要重启
+    ports:
+      - "28182:8080"                        # 左侧访问端口可改，右侧 8080 不改
+    volumes:
+      - relay-data:/data                    # 必须保留，用于持久化全部站点数据
+
+volumes:
+  relay-data:                               # 上面的命名卷需要此声明
 ```
 
-使用仓库中的 [compose.yml](compose.yml)，打开 `http://服务器IP:28182`。不需要 `.env`、密码或 setup-token 环境变量。**第一次初始化务必在可信网络完成：第一个完成验证器绑定的账户成为永久管理员。**
+**无需任何环境变量，没有 `.env`、初始密码或 setup-token。**账户、存储和公开注册都在网页内设置。命名卷由 Docker 管理权限，推荐直接使用；删除或重建容器不会删除此卷，但不要勾选删除数据卷，也不要执行 `docker compose down -v`。
 
-镜像：`ghcr.io/stylle/pocket-relay:latest`，支持 amd64 / arm64。仓库和镜像默认私密，部署前需用有 `read:packages` 权限的 GitHub Token 登录 `docker login ghcr.io`。如已启用 Docker Hub 发布，可将镜像改为 `stylle/pocket-relay:latest`。
+### 希望数据放在指定 NAS 文件夹
 
-不想登录镜像仓库，可下载源码后本地构建：
+使用 [docker-compose.nas.yml](docker-compose.nas.yml)，示例如下。路径按你的 NAS 修改，容器内的 `/data` 不改。此写法用宿主机文件夹，不需要末尾的顶层 `volumes` 声明。
+
+```yaml
+services:
+  pocket-relay:
+    image: ghcr.io/stylle/pocket-relay:latest
+    container_name: pocket-relay
+    restart: always
+    ports:
+      - "28182:8080"
+    volumes:
+      - /srv/pocket_relay/data:/data # 改为实际数据目录
+```
+
+镜像默认以 **UID/GID `10001:10001`** 运行。先创建专用文件夹并允许该用户读写，否则会出现 `permission denied`；只创建文件夹不一定有写权限。本镜像不识别 PUID/PGID 变量，也不需要为了部署改成 root。
+
+下面的命令**仅用于新建的本项目空目录**，须先修改成自己的路径；不要对 NAS 其他数据目录递归改权限：
+
+```bash
+sudo mkdir -p /srv/pocket_relay/data
+sudo chown 10001:10001 /srv/pocket_relay/data
+sudo chmod 700 /srv/pocket_relay/data
+```
+
+### 使用 SSH / 命令行部署
+
+把 [docker-compose.yml](docker-compose.yml) 保存到 NAS 项目文件夹，在该文件夹中执行：
+
+```bash
+docker login ghcr.io
+docker compose -f docker-compose.yml up -d
+```
+
+[compose.yml](compose.yml) 是同样的命名卷模板，保留兼容已有部署。**不要把两份文件作为不同项目同时启动**，否则会占用相同端口和容器名。
+
+### 可选：从源码构建
+
+不想登录镜像仓库，可先下载本私密仓库的完整源码（需要仓库访问权限），在源码目录执行：
 
 ```bash
 docker compose -f compose.build.yml up -d --build
 ```
 
-默认使用 Docker 命名卷，避免 NAS 目录权限问题。想指定宿主机目录，把挂载改为 `/你的目录:/data`，并预先让目录可被 **UID/GID 10001:10001** 读写。镜像以非 root 运行；不识别 PUID/PGID 环境变量。宿主机路径可自由选择，容器内 `/data` 不要改。
+这不是 NAS 粘贴 YAML 的必需步骤；仅使用上面的现成镜像模板即可部署。
 
 ## 使用
 
@@ -48,9 +102,11 @@ docker compose -f compose.build.yml up -d --build
 ## 更新与开发
 
 ```bash
-docker compose pull
-docker compose up -d
+docker compose -f docker-compose.yml pull
+docker compose -f docker-compose.yml up -d
 ```
+
+NAS 图形界面部署则更新镜像并重新创建原项目，保留原数据卷或文件夹挂载。若使用 `compose.yml` 或 `docker-compose.nas.yml`，命令中的文件名对应替换即可。
 
 Go 1.26+，无前端构建步骤：`go test ./... && go vet ./... && go run .`。非 Docker 默认数据目录 `./data`；可选 `DATA_DIR`、`LISTEN_ADDR`，默认端口 8080。没有其他必填变量。
 
