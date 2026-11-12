@@ -93,6 +93,11 @@ func (a *app) dav(ctx context.Context, s store, method, key string, body io.Read
 		return nil, e
 	}
 	r.SetBasicAuth(s.User, s.Password)
+	if f, ok := body.(*os.File); ok {
+		if info, e := f.Stat(); e == nil {
+			r.ContentLength = info.Size()
+		}
+	}
 	return davClient.Do(r)
 }
 func (a *app) remoteCommand(ctx context.Context, s store, args ...string) *exec.Cmd {
@@ -231,6 +236,20 @@ func (a *app) storeProbe(ctx context.Context, s store) error {
 	key := "probe-" + randomID()
 	if e = a.put(ctx, s, key, name); e != nil {
 		return e
+	}
+	defer a.remove(ctx, s, key)
+	readback, e := os.CreateTemp(filepath.Join(a.dir, "tmp"), "probe-read-")
+	if e != nil {
+		return e
+	}
+	defer os.Remove(readback.Name())
+	defer readback.Close()
+	if e = a.fetch(ctx, s, key, readback, int64(len("pocket-relay-storage-test"))); e != nil {
+		return e
+	}
+	b, e := os.ReadFile(readback.Name())
+	if e != nil || string(b) != "pocket-relay-storage-test" {
+		return errors.New("storage readback mismatch")
 	}
 	return a.remove(ctx, s, key)
 }
