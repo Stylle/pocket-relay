@@ -14,7 +14,7 @@ func (a *app) configTxSettings(tx *sql.Tx) settings {
 	if e := tx.QueryRow(`SELECT value FROM config WHERE id=1`).Scan(&raw); e != nil {
 		panic(e)
 	}
-	s := settings{SessionIdleMinutes: 15}
+	s := settings{SessionIdleMinutes: 15, AutoLoadImages: true}
 	if e := json.Unmarshal([]byte(raw), &s); e != nil {
 		panic(e)
 	}
@@ -69,7 +69,8 @@ func (a *app) adminSave(w http.ResponseWriter, r *http.Request) {
 	if _, ok := a.admin(w, r); !ok {
 		return
 	}
-	s := settings{SessionIdleMinutes: a.config().SessionIdleMinutes}
+	current := a.config()
+	s := settings{SessionIdleMinutes: current.SessionIdleMinutes, AutoLoadImages: current.AutoLoadImages}
 	previousIdle := s.SessionIdleMinutes
 	if !decode(w, r, &s) {
 		return

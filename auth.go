@@ -190,9 +190,9 @@ func (a *app) issue(u user) map[string]any {
 	if len(a.sessions) >= 10000 {
 		delete(a.sessions, oldestGlobal)
 	}
-	a.sessions[token] = session{User: u.ID, Expires: expiry, LastActive: active}
+	a.sessions[token] = session{User: u.ID, Started: active, Expires: expiry, LastActive: active}
 	a.mu.Unlock()
-	return map[string]any{"token": token, "user": u, "idle_minutes": idleMinutes, "last_active": active.UnixMilli(), "server_time": active.UnixMilli()}
+	return map[string]any{"token": token, "user": u, "started_at": active.UnixMilli(), "idle_minutes": idleMinutes, "last_active": active.UnixMilli(), "server_time": active.UnixMilli()}
 }
 
 func sessionExpired(s session, minutes int, at time.Time) bool {
@@ -213,7 +213,7 @@ func (a *app) sessionInfo(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "请重新验证")
 		return
 	}
-	reply(w, 200, map[string]any{"user": u, "idle_minutes": a.config().SessionIdleMinutes, "last_active": s.LastActive.UnixMilli(), "server_time": time.Now().UnixMilli()})
+	reply(w, 200, map[string]any{"user": u, "started_at": s.Started.UnixMilli(), "idle_minutes": a.config().SessionIdleMinutes, "last_active": s.LastActive.UnixMilli(), "server_time": time.Now().UnixMilli()})
 }
 
 func (a *app) sessionActivity(w http.ResponseWriter, r *http.Request) {

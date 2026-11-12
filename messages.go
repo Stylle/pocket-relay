@@ -17,15 +17,16 @@ import (
 )
 
 type message struct {
-	ID      string `json:"id"`
-	Device  string `json:"device"`
-	Text    string `json:"text"`
-	Created int64  `json:"created"`
-	Expires int64  `json:"expires"`
-	FileID  string `json:"file_id"`
-	Name    string `json:"name"`
-	MIME    string `json:"mime"`
-	Size    int64  `json:"size"`
+	Concealed bool   `json:"concealed"`
+	ID        string `json:"id"`
+	Device    string `json:"device"`
+	Text      string `json:"text"`
+	Created   int64  `json:"created"`
+	Expires   int64  `json:"expires"`
+	FileID    string `json:"file_id"`
+	Name      string `json:"name"`
+	MIME      string `json:"mime"`
+	Size      int64  `json:"size"`
 }
 
 func (a *app) listMessages(w http.ResponseWriter, r *http.Request) {
@@ -41,27 +42,72 @@ func (a *app) listMessages(w http.ResponseWriter, r *http.Request) {
 	if beforeID == "" {
 		beforeID = "ffffffffffffffffffffffffffffffff"
 	}
-	rows, e := a.db.Query(`SELECT m.id,m.device,m.text,m.created,m.expires,m.file_id,COALESCE(f.name,''),COALESCE(f.mime,''),COALESCE(f.size,0) FROM messages m LEFT JOIN files f ON f.id=m.file_id WHERE m.user_id=? AND (m.expires=0 OR m.expires>?) AND (m.created<? OR (m.created=? AND m.id<?)) ORDER BY m.created DESC,m.id DESC LIMIT 100`, u.ID, now(), before, before, beforeID)
+	q := r.URL.Query()
+	text := strings.TrimSpace(q.Get("q"))
+	if len(text) > 1024 {
+		fail(w, 400, "搜索文字不能超过 1024 字节")
+		return
+	}
+	from, to := int64(0), int64(1<<62)
+	for name, target := range map[string]*int64{"from": &from, "to": &to} {
+		if raw := q.Get(name); raw != "" {
+			value, err := strconv.ParseInt(raw, 10, 64)
+			if err != nil || value < 0 {
+				fail(w, 400, "搜索时间不正确")
+				return
+			}
+			*target = value
+		}
+	}
+	if from >= to {
+		fail(w, 400, "开始时间必须早于结束时间")
+		return
+	}
+	switch q.Get("scope") {
+	case "", "all":
+	case "current":
+		a.mu.Lock()
+		s := a.sessions[strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")]
+		a.mu.Unlock()
+		if s.Started.IsZero() {
+			fail(w, 401, "请重新验证")
+			return
+		}
+		from = max(from, s.Started.UnixMilli())
+	default:
+		fail(w, 400, "消息范围不正确")
+		return
+	}
+	filesOnly := q.Get("files") == "1"
+	// instr is a literal substring match: %, _ and SQL syntax are not wildcards.
+	// Search runs against the database, not just the most recent page in memory.
+	rows, e := a.db.Query(`SELECT m.id,m.device,CASE WHEN m.concealed=1 THEN '' ELSE m.text END,m.created,m.expires,m.file_id,COALESCE(f.name,''),COALESCE(f.mime,''),COALESCE(f.size,0),m.concealed FROM messages m LEFT JOIN files f ON f.id=m.file_id WHERE m.user_id=? AND (m.expires=0 OR m.expires>?) AND m.created>=? AND m.created<? AND instr(lower(m.text),lower(?))>0 AND (?=0 OR m.file_id!='') AND (m.created<? OR (m.created=? AND m.id<?)) ORDER BY m.created DESC,m.id DESC LIMIT 101`, u.ID, now(), from, to, text, filesOnly, before, before, beforeID)
 	if e != nil {
 		fail(w, 500, "读取消息失败")
 		return
 	}
-	defer rows.Close()
 	out := []message{}
 	for rows.Next() {
 		var m message
-		if e = rows.Scan(&m.ID, &m.Device, &m.Text, &m.Created, &m.Expires, &m.FileID, &m.Name, &m.MIME, &m.Size); e != nil {
+		if e = rows.Scan(&m.ID, &m.Device, &m.Text, &m.Created, &m.Expires, &m.FileID, &m.Name, &m.MIME, &m.Size, &m.Concealed); e != nil {
+			rows.Close()
 			fail(w, 500, "读取消息失败")
 			return
 		}
 		out = append(out, m)
 	}
 	if rows.Err() != nil {
+		rows.Close()
 		fail(w, 500, "读取消息失败")
 		return
 	}
+	rows.Close()
+	hasMore := len(out) > 100
+	if hasMore {
+		out = out[:100]
+	}
 	config := a.config()
-	payload, e := json.Marshal(map[string]any{"messages": out, "user": u, "device_template": config.DeviceTemplate, "max_file_mb": config.MaxMB})
+	payload, e := json.Marshal(map[string]any{"messages": out, "has_more": hasMore, "auto_load_images": config.AutoLoadImages, "user": u, "device_template": config.DeviceTemplate, "max_file_mb": config.MaxMB})
 	if e != nil {
 		fail(w, 500, "读取消息失败")
 		return
@@ -75,6 +121,21 @@ func (a *app) listMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Write(payload)
+}
+
+// Concealed text is fetched only on an explicit reveal; it is never included in
+// list responses. This is display privacy, not end-to-end or at-rest encryption.
+func (a *app) messageText(w http.ResponseWriter, r *http.Request) {
+	u, ok := a.auth(w, r)
+	if !ok {
+		return
+	}
+	var text string
+	if err := a.db.QueryRow(`SELECT text FROM messages WHERE id=? AND user_id=? AND (expires=0 OR expires>?)`, r.PathValue("id"), u.ID, now()).Scan(&text); err != nil {
+		fail(w, 404, "消息不存在或已过期")
+		return
+	}
+	reply(w, 200, map[string]string{"text": text})
 }
 func expiry(ttl int64) (int64, error) {
 	if ttl == 0 {
@@ -102,6 +163,7 @@ func (a *app) sendMessage(w http.ResponseWriter, r *http.Request) {
 	s := a.config()
 	var text, device, fileID, name, kind, storeID, digest string
 	var expires, size int64
+	var concealed bool
 	temp := ""
 	stored := false
 	committed := false
@@ -184,6 +246,13 @@ func (a *app) sendMessage(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				switch part.FormName() {
+				case "concealed":
+					concealed, e = strconv.ParseBool(string(b))
+					if e != nil {
+						part.Close()
+						fail(w, 400, "正文遮挡选项不正确")
+						return
+					}
 				case "text":
 					text = string(b)
 				case "device":
@@ -207,14 +276,16 @@ func (a *app) sendMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		var in struct {
-			Text   string `json:"text"`
-			Device string `json:"device"`
-			TTL    int64  `json:"ttl"`
+			Concealed bool   `json:"concealed"`
+			Text      string `json:"text"`
+			Device    string `json:"device"`
+			TTL       int64  `json:"ttl"`
 		}
 		if !decode(w, r, &in) {
 			return
 		}
 		text = in.Text
+		concealed = in.Concealed
 		device = in.Device
 		var e error
 		expires, e = expiry(in.TTL)
@@ -272,7 +343,7 @@ func (a *app) sendMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	id := randomID()
-	_, e = tx.Exec(`INSERT INTO messages(id,user_id,device,text,created,expires,file_id) VALUES(?,?,?,?,?,?,?)`, id, u.ID, a.deviceTemplate(s, r, device), text, time.Now().UnixMilli(), expires, fileID)
+	_, e = tx.Exec(`INSERT INTO messages(id,user_id,device,text,created,expires,file_id,concealed) VALUES(?,?,?,?,?,?,?,?)`, id, u.ID, a.deviceTemplate(s, r, device), text, time.Now().UnixMilli(), expires, fileID, concealed && text != "")
 	if e != nil {
 		fail(w, 500, "保存失败")
 		return

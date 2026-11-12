@@ -36,6 +36,7 @@ type user struct {
 }
 type session struct {
 	User       string
+	Started    time.Time
 	Expires    time.Time
 	LastActive time.Time
 }
@@ -74,6 +75,7 @@ type settings struct {
 	DeviceTemplate     string `json:"device_template"`
 	ActiveStore        string `json:"active_store"`
 	SessionIdleMinutes int    `json:"session_idle_minutes"`
+	AutoLoadImages     bool   `json:"auto_load_images"`
 }
 
 func randomID() string {
@@ -124,13 +126,17 @@ func openApp(dir string) (*app, error) {
 		db.Close()
 		return nil, e
 	}
+	if e = migrateMessages(db); e != nil {
+		db.Close()
+		return nil, e
+	}
 	// A process may have stopped between reserving an object and committing its
 	// message. Reclaim it through the same retryable deletion queue on startup.
 	if _, e = db.Exec(`UPDATE files SET deleted=1 WHERE deleted=-1`); e != nil {
 		db.Close()
 		return nil, e
 	}
-	defaults, _ := json.Marshal(settings{GuestHours: 1, MaxMB: 256, QuotaMB: 5120, DeviceTemplate: "{device} · {ip}", ActiveStore: "local", SessionIdleMinutes: 15})
+	defaults, _ := json.Marshal(settings{GuestHours: 1, MaxMB: 256, QuotaMB: 5120, DeviceTemplate: "{device} · {ip}", ActiveStore: "local", SessionIdleMinutes: 15, AutoLoadImages: true})
 	if _, e = db.Exec(`INSERT OR IGNORE INTO config(id,value) VALUES(1,?)`, string(defaults)); e != nil {
 		db.Close()
 		return nil, e
@@ -149,7 +155,7 @@ func (a *app) config() settings {
 	if e := a.db.QueryRow(`SELECT value FROM config WHERE id=1`).Scan(&b); e != nil {
 		panic(e)
 	}
-	s := settings{SessionIdleMinutes: 15}
+	s := settings{SessionIdleMinutes: 15, AutoLoadImages: true}
 	if e := json.Unmarshal([]byte(b), &s); e != nil {
 		panic(e)
 	}
@@ -252,6 +258,7 @@ func (a *app) handler() http.Handler {
 	})
 	mux.HandleFunc("GET /api/messages", a.listMessages)
 	mux.HandleFunc("POST /api/messages", a.sendMessage)
+	mux.HandleFunc("GET /api/messages/{id}/text", a.messageText)
 	mux.HandleFunc("DELETE /api/messages/{id}", a.deleteMessage)
 	mux.HandleFunc("POST /api/files/{id}/ticket", a.fileTicket)
 	mux.HandleFunc("GET /file/{id}", a.download)

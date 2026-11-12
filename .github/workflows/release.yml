@@ -22,6 +22,8 @@ jobs:
         with:
           node-version: 24
       - run: go test -race -timeout 180s -v ./... && go vet ./... && node --check web/app.js
+      - name: Root bootstrap safety tests
+        run: sudo "$(which go)" test -v ./cmd/data-init
       - run: npm ci && npm test
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
@@ -36,11 +38,27 @@ jobs:
           trap 'docker logs relay-test; docker rm -f relay-test; docker volume rm relay-test-data' EXIT
           for n in $(seq 1 30); do curl -fsS http://127.0.0.1:28182/healthz && break || sleep 1; done
           curl -fsS http://127.0.0.1:28182/api/status | grep '"setup":true'
-          test "$(docker exec relay-test id -u)" = 10001
+          test "$(docker exec relay-test awk '/^Uid:/ {print $2}' /proc/1/status)" = 10001
           docker exec relay-test rclone help backends | grep -i 'smb'
           docker restart relay-test
           for n in $(seq 1 30); do curl -fsS http://127.0.0.1:28182/healthz && break || sleep 1; done
           curl -fsS http://127.0.0.1:28182/api/status | grep '"setup":true'
+      - name: Root-owned NAS bind directory initializes automatically
+        run: |
+          set -euo pipefail
+          data=$(mktemp -d)
+          sudo chown root:root "$data"
+          sudo chmod 700 "$data"
+          docker run -d --name relay-bind -p 127.0.0.1:28183:8080 -v "$data:/data" pocket-relay:test
+          trap 'docker logs relay-bind; docker rm -f relay-bind' EXIT
+          for n in $(seq 1 30); do curl -fsS http://127.0.0.1:28183/healthz && break || sleep 1; done
+          curl -fsS http://127.0.0.1:28183/api/status | grep '"setup":true'
+          test "$(sudo stat -c %u "$data")" = 10001
+          test "$(sudo stat -c %a "$data/master.key")" = 600
+          test "$(docker exec relay-bind awk '/^Uid:/ {print $2}' /proc/1/status)" = 10001
+          docker restart relay-bind
+          for n in $(seq 1 30); do curl -fsS http://127.0.0.1:28183/healthz && break || sleep 1; done
+          curl -fsS http://127.0.0.1:28183/api/status | grep '"setup":true'
   smb:
     runs-on: ubuntu-latest
     steps:
