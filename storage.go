@@ -111,6 +111,9 @@ func (a *app) remoteCommand(ctx context.Context, s store, args ...string) *exec.
 		encoded = nil
 	}
 	cmd.Env = append(os.Environ(), "RCLONE_CONFIG_PR_TYPE=smb", "RCLONE_CONFIG_PR_HOST="+s.URL, "RCLONE_CONFIG_PR_USER="+s.User, "RCLONE_CONFIG_PR_PASS="+strings.TrimSpace(string(encoded)), "RCLONE_CONFIG_PR_DOMAIN="+s.Domain)
+	if os.Getenv("POCKET_SMB_TEST") == "1" {
+		cmd.Stderr = os.Stderr
+	}
 	return cmd
 }
 func (a *app) put(ctx context.Context, s store, key, source string) error {

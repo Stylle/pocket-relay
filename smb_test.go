@@ -15,7 +15,7 @@ func TestSMBIntegration(t *testing.T) {
 	a := testApp(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	s := store{Kind: "smb", URL: "127.0.0.1", Root: "relay/pocket-test", User: "guest"}
+	s := store{Kind: "smb", URL: "127.0.0.1", Root: "relay/pocket-test", User: os.Getenv("POCKET_SMB_USER"), Password: os.Getenv("POCKET_SMB_PASSWORD")}
 	if e := a.storeProbe(ctx, s); e != nil {
 		out, _ := a.remoteCommand(ctx, s, "lsd", "pr:").CombinedOutput()
 		t.Logf("Isolated fixture diagnostic: %s", out)
