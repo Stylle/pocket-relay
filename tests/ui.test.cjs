@@ -711,3 +711,95 @@ test("video remains preload none and never autoplays", async (t) => {
   assert.equal(video.autoplay, false);
   assert.equal(video.controls, true);
 });
+
+test("late reveal response cannot expose content after privacy revision changes", async (t) => {
+  const f = fixture(t, {
+    messages: [
+      {
+        id: "late",
+        device: "test",
+        text: "",
+        concealed: true,
+        privacy_version: 0,
+        created: Date.now(),
+        expires: 0,
+        file_id: "",
+      },
+    ],
+  });
+  await settle();
+  await login(f);
+  const fetch = f.w.fetch;
+  let release;
+  f.w.fetch = (path, opts) =>
+    path.endsWith("/text")
+      ? new Promise((resolve) => {
+          release = () =>
+            resolve(
+              new Response(
+                JSON.stringify({
+                  text: "late-secret@example.com",
+                  privacy_version: 0,
+                }),
+                { status: 200 },
+              ),
+            );
+        })
+      : fetch(path, opts);
+  f.$("timeline").querySelector('[aria-label="查看隐私消息"]').click();
+  await settle();
+  f.w.__test.state.privacyRevision++;
+  f.w.__test.state.messages[0].privacy_version = 1;
+  release();
+  await settle();
+  assert.equal(f.w.__test.state.revealed.has("late"), false);
+  assert.equal(f.$("timeline").querySelectorAll("a").length, 0);
+});
+
+test("late thumbnail and original requests cannot load or reopen after context changes", async (t) => {
+  const f = fixture(t, {
+    autoLoadImages: false,
+    messages: [
+      {
+        id: "late-image",
+        device: "test",
+        text: "",
+        created: Date.now(),
+        expires: 0,
+        file_id: "late-file",
+        name: "late.png",
+        mime: "image/png",
+        size: 10,
+      },
+    ],
+  });
+  await settle();
+  await login(f);
+  const fetch = f.w.fetch;
+  let release;
+  f.w.fetch = (path, opts) =>
+    path.includes("/ticket")
+      ? new Promise((resolve) => {
+          release = () =>
+            resolve(
+              new Response(JSON.stringify({ url: "/file/late?ticket=test" }), {
+                status: 200,
+              }),
+            );
+        })
+      : fetch(path, opts);
+  f.$("timeline").querySelector('[aria-label="加载图片"]').click();
+  await settle();
+  const thumbnail = f.$("timeline").querySelector("img");
+  f.w.__test.state.generation++;
+  release();
+  await settle();
+  assert.equal(thumbnail.getAttribute("src"), null);
+  f.$("timeline").querySelector(".image-thumb").click();
+  await settle();
+  f.w.__test.state.privacyRevision++;
+  release();
+  await settle();
+  assert.equal(f.$("image-viewer").hidden, true);
+  assert.equal(f.$("image-viewer-image").getAttribute("src"), null);
+});

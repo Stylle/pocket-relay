@@ -321,6 +321,7 @@ document
   );
 $("mobile-menu").onclick = () => $("workspace").classList.toggle("menu-open");
 async function setView(view) {
+  closeOriginal();
   state.generation++;
   state.polling = false;
   state.older = [];
@@ -476,8 +477,16 @@ function closeOriginal() {
 }
 async function openOriginal(m, trigger) {
   const token = state.token,
+    generation = state.generation,
+    revision = state.privacyRevision,
     url = await ticket(m.file_id);
-  if (token !== state.token) return;
+  if (
+    token !== state.token ||
+    generation !== state.generation ||
+    revision !== state.privacyRevision ||
+    (m.concealed && !state.revealed.has(m.id))
+  )
+    return;
   originalTrigger = trigger;
   $("image-viewer-name").textContent = m.name;
   $("image-viewer-image").alt = m.name;
@@ -499,10 +508,17 @@ document.addEventListener("keydown", (e) => {
 async function revealMessage(m) {
   if (state.revealing.has(m.id)) return;
   state.revealing.add(m.id);
-  const token = state.token;
+  const token = state.token,
+    generation = state.generation,
+    revision = state.privacyRevision;
   try {
     const result = await json("/api/messages/" + m.id + "/text");
-    if (token !== state.token) return;
+    if (
+      token !== state.token ||
+      generation !== state.generation ||
+      revision !== state.privacyRevision
+    )
+      return;
     if ((result.privacy_version ?? 0) !== (m.privacy_version ?? 0)) {
       state.signature = "";
       await refresh();
@@ -565,23 +581,32 @@ async function togglePrivacy(m) {
   toast(concealed ? "已设为隐私；已送达 TG 的副本不会撤回" : "已取消隐私");
 }
 async function loadPreview(element, m, attempt = 0) {
+  const token = state.token,
+    generation = state.generation,
+    revision = state.privacyRevision;
+  const current = () =>
+    token === state.token &&
+    generation === state.generation &&
+    revision === state.privacyRevision &&
+    (!m.concealed || state.revealed.has(m.id));
   const retry = () => {
-    if (attempt < 4 && state.token) {
+    if (attempt < 4 && current()) {
       setTimeout(
         () => {
-          if (element.isConnected && state.token)
+          if (element.isConnected && current())
             loadPreview(element, m, attempt + 1);
         },
         500 * 2 ** attempt,
       );
-    } else if (element.isConnected)
+    } else if (element.isConnected && current())
       element.replaceWith(
         node("p", "muted small", "预览暂不可用或格式不受支持，请尝试下载。"),
       );
   };
   element.onerror = retry;
   try {
-    element.src = (await ticket(m.file_id)) + "&inline=1";
+    const url = await ticket(m.file_id);
+    if (element.isConnected && current()) element.src = url + "&inline=1";
   } catch {
     retry();
   }
@@ -638,6 +663,11 @@ function renderMessages() {
         node("span", "expiry-badge", date(m.expires * 1000) + " 过期"),
       );
     const bubble = node("div", "bubble");
+    if (
+      state.revealed.has(m.id) &&
+      state.revealed.get(m.id).version !== (m.privacy_version ?? 0)
+    )
+      state.revealed.delete(m.id);
     const hidden = m.concealed && !state.revealed.has(m.id);
     if (hidden) {
       bubble.append(privatePlaceholder(m));
