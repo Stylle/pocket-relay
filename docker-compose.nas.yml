@@ -1,8 +1,8 @@
 # 可选：飞牛 / 通用 NAS 指定宿主机数据文件夹。
-# 私密镜像需先登录 ghcr.io。默认优先用 docker-compose.yml，省去文件夹权限配置。
+# 公共镜像无需登录。默认优先用 docker-compose.yml，省去文件夹权限配置。
 services:
   pocket-relay:
-    image: ghcr.io/stylle/pocket-relay:latest # 必填，不能用尚未发布的 Docker Hub 地址
+    image: stylle/pocket-relay:latest # 必填；公共镜像无需登录
     container_name: pocket-relay             # 可省略，也可改名
     restart: always                         # 建议保留，恢复备份时需要重启
     ports:

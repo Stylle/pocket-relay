@@ -106,3 +106,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: stylle/pocket-relay:latest,stylle/pocket-relay:${{ github.ref_name }}
+      - name: Publish public deployment guide
+        if: steps.auth.outputs.ready == 'true'
+        env:
+          HUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: python3 scripts/publish-overview.py

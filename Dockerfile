@@ -12,6 +12,7 @@ RUN apk add --no-cache ca-certificates tzdata rclone \
     && addgroup -g 10001 relay && adduser -D -H -u 10001 -G relay relay \
     && mkdir -p /data && chown relay:relay /data
 COPY --from=build /out/pocket-relay /usr/local/bin/pocket-relay
+COPY LICENSE /usr/share/licenses/pocket-relay/LICENSE
 WORKDIR /app
 ENV DATA_DIR=/data LISTEN_ADDR=:8080 TZ=Asia/Shanghai
 USER 10001:10001

@@ -362,7 +362,7 @@ func (a *app) download(w http.ResponseWriter, r *http.Request) {
 	s, sessionOK := a.sessions[t.Session]
 	a.mu.Unlock()
 	id := r.PathValue("id")
-	if !ok || !sessionOK || time.Now().After(s.Expires) || t.File != id || time.Now().After(t.Expires) {
+	if !ok || !sessionOK || sessionExpired(s, a.config().SessionIdleMinutes, time.Now()) || t.File != id || time.Now().After(t.Expires) {
 		fail(w, 401, "下载链接已过期，请重新点击下载")
 		return
 	}
@@ -433,9 +433,10 @@ func (a *app) janitor(ctx context.Context) {
 	}
 }
 func (a *app) cleanup(ctx context.Context) {
+	idleMinutes := a.config().SessionIdleMinutes
 	a.mu.Lock()
 	for k, v := range a.sessions {
-		if time.Now().After(v.Expires) {
+		if sessionExpired(v, idleMinutes, time.Now()) {
 			delete(a.sessions, k)
 		}
 	}

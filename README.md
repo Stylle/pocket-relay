@@ -8,21 +8,21 @@
 
 - 同一账户、多设备同步，消息互相隔离；支持拖放、多选与粘贴图片。
 - 复制文字和图片、下载文件，消息默认永久保留，也可设置有效期。
-- 标准 TOTP 验证器登录；首个账户为管理员，公开注册默认关闭。
+- 标准 TOTP 验证器登录；刷新保留登录、可配置空闲超时、主动退出；公开注册默认关闭。
 - 本地、WebDAV、SMB 存储；密码加密的整站备份与恢复。
 
 ## 最简部署
 
-支持 `linux/amd64` / `linux/arm64`。**当前镜像在私密 GHCR，需有访问权限并先登录 `ghcr.io`；Docker Hub 暂未发布。**令牌需要 `read:packages` 权限，不要写进 Compose。
+支持 `linux/amd64` / `linux/arm64`。[Docker Hub 公共镜像](https://hub.docker.com/r/stylle/pocket-relay)，可直接拉取，无需登录。
 
 将以下内容保存为 `docker-compose.yml`，或直接粘贴到 NAS 的 Compose 管理页面：
 
 ```yaml
 # 飞牛 / 通用 NAS：可直接上传此文件或复制到 Compose 项目中。
-# 私密镜像需先在 NAS 上登录 ghcr.io，不能匿名拉取。
+# Docker Hub 公共镜像，可直接拉取，无需登录。
 services:
   pocket-relay:
-    image: ghcr.io/stylle/pocket-relay:latest # 必填；GitHub Token 不要写在此文件中
+    image: stylle/pocket-relay:latest # 必填；公共镜像，无需仓库凭据
     container_name: pocket-relay             # 可省略，也可改名
     restart: always                         # 建议保留，恢复备份时需要重启
     ports:
@@ -38,7 +38,6 @@ volumes:
 ```
 
 ```bash
-docker login ghcr.io
 docker compose -f docker-compose.yml up -d
 ```
 
@@ -57,4 +56,4 @@ docker compose -f docker-compose.yml up -d
 
 ## 使用边界
 
-每次重新打开或刷新页面需要验证码。复制图片依赖 HTTPS 或 localhost 与浏览器支持。文件不是端到端加密；管理员整站备份包含全部账户数据，远程附件本体需另行备份。当前未接入微信机器人。访问与备份安全详见指南。
+同一标签页刷新保留登录，默认无操作 15 分钟后重新验证；后台可设置分钟、天或关闭空闲超时。新导航、标签页重新打开和后退缓存恢复需验证；浏览器的自动会话恢复存在平台差异，详见指南。复制图片依赖 HTTPS 或 localhost 与浏览器支持。文件不是端到端加密；管理员整站备份包含全部账户数据，远程附件本体需另行备份。当前未接入微信机器人。访问与备份安全详见指南。

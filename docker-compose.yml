@@ -1,8 +1,8 @@
 # 飞牛 / 通用 NAS：可直接上传此文件或复制到 Compose 项目中。
-# 私密镜像需先在 NAS 上登录 ghcr.io，不能匿名拉取。
+# Docker Hub 公共镜像，可直接拉取，无需登录。
 services:
   pocket-relay:
-    image: ghcr.io/stylle/pocket-relay:latest # 必填；GitHub Token 不要写在此文件中
+    image: stylle/pocket-relay:latest # 必填；公共镜像，无需仓库凭据
     container_name: pocket-relay             # 可省略，也可改名
     restart: always                         # 建议保留，恢复备份时需要重启
     ports:

@@ -160,14 +160,81 @@ func (a *app) enroll(w http.ResponseWriter, r *http.Request) {
 }
 func (a *app) issue(u user) map[string]any {
 	token := randomID() + randomID()
-	expiry := time.Now().Add(12 * time.Hour)
-	if u.Expires > 0 && time.Unix(u.Expires, 0).Before(expiry) {
+	expiry := time.Time{}
+	if u.Expires > 0 {
 		expiry = time.Unix(u.Expires, 0)
 	}
+	active := time.Now()
+	idleMinutes := a.config().SessionIdleMinutes
 	a.mu.Lock()
-	a.sessions[token] = session{u.ID, expiry}
+	var oldestUser, oldestGlobal string
+	count := 0
+	for existing, s := range a.sessions {
+		if sessionExpired(s, idleMinutes, active) {
+			delete(a.sessions, existing)
+			continue
+		}
+		if oldestGlobal == "" || s.LastActive.Before(a.sessions[oldestGlobal].LastActive) {
+			oldestGlobal = existing
+		}
+		if s.User == u.ID {
+			count++
+			if oldestUser == "" || s.LastActive.Before(a.sessions[oldestUser].LastActive) {
+				oldestUser = existing
+			}
+		}
+	}
+	if count >= 64 {
+		delete(a.sessions, oldestUser)
+	}
+	if len(a.sessions) >= 10000 {
+		delete(a.sessions, oldestGlobal)
+	}
+	a.sessions[token] = session{User: u.ID, Expires: expiry, LastActive: active}
 	a.mu.Unlock()
-	return map[string]any{"token": token, "user": u}
+	return map[string]any{"token": token, "user": u, "idle_minutes": idleMinutes, "last_active": active.UnixMilli(), "server_time": active.UnixMilli()}
+}
+
+func sessionExpired(s session, minutes int, at time.Time) bool {
+	return (!s.Expires.IsZero() && !at.Before(s.Expires)) || (minutes > 0 && (s.LastActive.IsZero() || !at.Before(s.LastActive.Add(time.Duration(minutes)*time.Minute))))
+}
+
+// Background polling and previews do not renew the idle timeout.
+func (a *app) sessionInfo(w http.ResponseWriter, r *http.Request) {
+	u, ok := a.auth(w, r)
+	if !ok {
+		return
+	}
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	a.mu.Lock()
+	s, exists := a.sessions[token]
+	a.mu.Unlock()
+	if !exists {
+		fail(w, 401, "请重新验证")
+		return
+	}
+	reply(w, 200, map[string]any{"user": u, "idle_minutes": a.config().SessionIdleMinutes, "last_active": s.LastActive.UnixMilli(), "server_time": time.Now().UnixMilli()})
+}
+
+func (a *app) sessionActivity(w http.ResponseWriter, r *http.Request) {
+	if _, ok := a.auth(w, r); !ok {
+		return
+	}
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	minutes := a.config().SessionIdleMinutes
+	active := time.Now()
+	a.mu.Lock()
+	s, exists := a.sessions[token]
+	if !exists || sessionExpired(s, minutes, active) {
+		delete(a.sessions, token)
+		a.mu.Unlock()
+		fail(w, 401, "登录已超时，请重新验证")
+		return
+	}
+	s.LastActive = active
+	a.sessions[token] = s
+	a.mu.Unlock()
+	reply(w, 200, map[string]any{"idle_minutes": minutes, "last_active": active.UnixMilli(), "server_time": active.UnixMilli()})
 }
 func (a *app) confirm(w http.ResponseWriter, r *http.Request) {
 	if a.limited(r) {

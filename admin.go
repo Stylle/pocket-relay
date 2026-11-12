@@ -14,14 +14,14 @@ func (a *app) configTxSettings(tx *sql.Tx) settings {
 	if e := tx.QueryRow(`SELECT value FROM config WHERE id=1`).Scan(&raw); e != nil {
 		panic(e)
 	}
-	var s settings
+	s := settings{SessionIdleMinutes: 15}
 	if e := json.Unmarshal([]byte(raw), &s); e != nil {
 		panic(e)
 	}
 	return s
 }
 func validateSettings(s settings) bool {
-	return s.GuestHours >= 1 && s.GuestHours <= 8760 && s.MaxMB >= 1 && s.MaxMB <= 10240 && s.QuotaMB >= s.MaxMB && s.QuotaMB <= 1048576 && len(s.DeviceTemplate) > 0 && len(s.DeviceTemplate) < 200 && strings.Contains(s.DeviceTemplate, "{device}")
+	return s.SessionIdleMinutes >= 0 && s.SessionIdleMinutes <= 5256000 && s.GuestHours >= 1 && s.GuestHours <= 8760 && s.MaxMB >= 1 && s.MaxMB <= 10240 && s.QuotaMB >= s.MaxMB && s.QuotaMB <= 1048576 && len(s.DeviceTemplate) > 0 && len(s.DeviceTemplate) < 200 && strings.Contains(s.DeviceTemplate, "{device}")
 }
 func (a *app) adminGet(w http.ResponseWriter, r *http.Request) {
 	if _, ok := a.admin(w, r); !ok {
@@ -69,12 +69,13 @@ func (a *app) adminSave(w http.ResponseWriter, r *http.Request) {
 	if _, ok := a.admin(w, r); !ok {
 		return
 	}
-	var s settings
+	s := settings{SessionIdleMinutes: a.config().SessionIdleMinutes}
+	previousIdle := s.SessionIdleMinutes
 	if !decode(w, r, &s) {
 		return
 	}
 	if !validateSettings(s) {
-		fail(w, 400, "配置超出范围；访客 1–8760 小时、文件 1–10240 MB、配额不小于文件大小，模板须包含 {device}")
+		fail(w, 400, "配置超出范围；空闲超时为 0–5256000 分钟（0 不超时），访客 1–8760 小时、文件 1–10240 MB、配额不小于文件大小，模板须包含 {device}")
 		return
 	}
 	if _, e := a.getStore(s.ActiveStore); e != nil {
@@ -88,6 +89,15 @@ func (a *app) adminSave(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, "保存失败")
 		return
 	}
+	// A relaxed policy must not revive a session that already expired under
+	// the previous policy; a stricter policy also takes effect immediately.
+	a.mu.Lock()
+	for token, session := range a.sessions {
+		if sessionExpired(session, previousIdle, time.Now()) || sessionExpired(session, s.SessionIdleMinutes, time.Now()) {
+			delete(a.sessions, token)
+		}
+	}
+	a.mu.Unlock()
 	reply(w, 200, map[string]bool{"ok": true})
 }
 func (a *app) addStore(w http.ResponseWriter, r *http.Request) {

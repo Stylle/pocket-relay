@@ -35,8 +35,9 @@ type user struct {
 	Expires int64  `json:"expires"`
 }
 type session struct {
-	User    string
-	Expires time.Time
+	User       string
+	Expires    time.Time
+	LastActive time.Time
 }
 type enrollment struct {
 	Name, Secret string
@@ -66,12 +67,13 @@ type app struct {
 	transfers   chan struct{}
 }
 type settings struct {
-	Public         bool   `json:"public_registration"`
-	GuestHours     int    `json:"guest_hours"`
-	MaxMB          int64  `json:"max_file_mb"`
-	QuotaMB        int64  `json:"quota_mb"`
-	DeviceTemplate string `json:"device_template"`
-	ActiveStore    string `json:"active_store"`
+	Public             bool   `json:"public_registration"`
+	GuestHours         int    `json:"guest_hours"`
+	MaxMB              int64  `json:"max_file_mb"`
+	QuotaMB            int64  `json:"quota_mb"`
+	DeviceTemplate     string `json:"device_template"`
+	ActiveStore        string `json:"active_store"`
+	SessionIdleMinutes int    `json:"session_idle_minutes"`
 }
 
 func randomID() string {
@@ -128,7 +130,7 @@ func openApp(dir string) (*app, error) {
 		db.Close()
 		return nil, e
 	}
-	defaults, _ := json.Marshal(settings{GuestHours: 1, MaxMB: 256, QuotaMB: 5120, DeviceTemplate: "{device} · {ip}", ActiveStore: "local"})
+	defaults, _ := json.Marshal(settings{GuestHours: 1, MaxMB: 256, QuotaMB: 5120, DeviceTemplate: "{device} · {ip}", ActiveStore: "local", SessionIdleMinutes: 15})
 	if _, e = db.Exec(`INSERT OR IGNORE INTO config(id,value) VALUES(1,?)`, string(defaults)); e != nil {
 		db.Close()
 		return nil, e
@@ -147,7 +149,7 @@ func (a *app) config() settings {
 	if e := a.db.QueryRow(`SELECT value FROM config WHERE id=1`).Scan(&b); e != nil {
 		panic(e)
 	}
-	var s settings
+	s := settings{SessionIdleMinutes: 15}
 	if e := json.Unmarshal([]byte(b), &s); e != nil {
 		panic(e)
 	}
@@ -186,13 +188,16 @@ func (a *app) findUser(id string) (user, error) {
 }
 func (a *app) auth(w http.ResponseWriter, r *http.Request) (user, bool) {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	idleMinutes := a.config().SessionIdleMinutes
 	a.mu.Lock()
 	s, ok := a.sessions[token]
-	a.mu.Unlock()
-	if !ok || time.Now().After(s.Expires) {
+	if !ok || sessionExpired(s, idleMinutes, time.Now()) {
+		delete(a.sessions, token)
+		a.mu.Unlock()
 		fail(w, 401, "请重新输入验证器验证码")
 		return user{}, false
 	}
+	a.mu.Unlock()
 	u, e := a.findUser(s.User)
 	if e != nil {
 		fail(w, 401, "账户已过期或不存在")
@@ -237,6 +242,8 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("POST /api/enroll", a.enroll)
 	mux.HandleFunc("POST /api/enroll/confirm", a.confirm)
 	mux.HandleFunc("POST /api/login", a.login)
+	mux.HandleFunc("GET /api/session", a.sessionInfo)
+	mux.HandleFunc("POST /api/session/activity", a.sessionActivity)
 	mux.HandleFunc("POST /api/logout", func(w http.ResponseWriter, r *http.Request) {
 		a.mu.Lock()
 		delete(a.sessions, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))

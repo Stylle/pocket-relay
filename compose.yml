@@ -1,7 +1,7 @@
 services:
   pocket-relay:
     # 必填：镜像地址。私密 GHCR 镜像需先 docker login ghcr.io。
-    image: ghcr.io/stylle/pocket-relay:latest
+    image: stylle/pocket-relay:latest
     container_name: pocket-relay
     restart: always
     ports:

@@ -4,16 +4,16 @@
 
 ## Docker Compose 部署
 
-**当前镜像：`ghcr.io/stylle/pocket-relay:latest`，支持 amd64 / arm64。镜像为私密，需要先登录 GHCR，不能匿名拉取。Docker Hub 暂未发布，不要使用 `stylle/pocket-relay:latest` 部署。**
+**公共镜像：`stylle/pocket-relay:latest`，支持 amd64 / arm64，无需登录镜像仓库。**
 
-1. 在 NAS 的镜像仓库认证中登录 `ghcr.io`；账号是 GitHub 用户名，密码是具有 `read:packages` 权限且能访问本镜像的 GitHub Token。也可通过 NAS 的 SSH 终端执行 `docker login ghcr.io`，按提示输入。不要把 Token 写入 Compose。
+1. 准备 Docker 和 Compose，无需镜像仓库登录。
 2. 在 NAS 的 Docker / Compose 管理界面新建项目，粘贴下面的 YAML 并启动。不同 NAS 的入口名称可能不同；如果要求上传文件，使用 [docker-compose.yml](../docker-compose.yml)。**纯镜像部署，不需要下载源码或设置构建目录。**
 3. 打开 `http://NAS的IP:28182`，填写账户名并绑定验证器。**第一次初始化在可信内网完成，第一个完成绑定的账户为永久管理员。**
 
 ```yaml
 services:
   pocket-relay:
-    image: ghcr.io/stylle/pocket-relay:latest # 必须保留；先登录私密镜像仓库
+    image: stylle/pocket-relay:latest # 必须保留；公共镜像，无需登录
     container_name: pocket-relay             # 可省略，也可改名
     restart: always                         # 建议保留，恢复备份时需要重启
     ports:
@@ -34,7 +34,7 @@ volumes:
 ```yaml
 services:
   pocket-relay:
-    image: ghcr.io/stylle/pocket-relay:latest
+    image: stylle/pocket-relay:latest
     container_name: pocket-relay
     restart: always
     ports:
@@ -58,7 +58,6 @@ sudo chmod 700 /srv/pocket-relay/data
 把 [docker-compose.yml](../docker-compose.yml) 保存到 NAS 项目文件夹，在该文件夹中执行：
 
 ```bash
-docker login ghcr.io
 docker compose -f docker-compose.yml up -d
 ```
 
@@ -66,7 +65,7 @@ docker compose -f docker-compose.yml up -d
 
 ### 可选：从源码构建
 
-不想登录镜像仓库，可先下载本私密仓库的完整源码（需要仓库访问权限），在源码目录执行：
+需要自行构建时，先取得代码仓库访问权限并下载完整源码，在源码目录执行：
 
 ```bash
 docker compose -f compose.build.yml up -d --build
@@ -77,7 +76,9 @@ docker compose -f compose.build.yml up -d --build
 ## 使用
 
 - 首次输入账户名，用 Google Authenticator 或其他支持标准 TOTP 的验证器扫码，也能手动添加密钥。**密钥只在绑定时展示，请备份验证器。腾讯验证器需确认支持添加标准 TOTP 账户；不是 QQ 专用动态令牌。**
-- 每次重新打开或刷新页面都需验证码；凭据只在页面内存中保留，最长 12 小时。一个验证码只能用一次，多设备登录请等待下一组。设备需同步时间。
+- 同一标签页的普通刷新恢复登录；新导航、新打开页面与后退缓存恢复重新验证。凭据只保存到标签页的 `sessionStorage`，不写入 `localStorage`。默认无操作 15 分钟退出，后台可配置分钟、天，或「不因空闲自动退出」；后台轮询不会续期。主动退出会立即撤销服务端登录和下载凭据。
+- 浏览器对崩溃恢复、启动恢复和「恢复上次会话」的导航标记存在差异，网页无法可靠得知整个浏览器进程是否退出，不能承诺所有恢复方式都会重新验证。严格要求关闭重验时请关闭浏览器的会话恢复或使用隐私窗口，并保留空闲超时。
+- 不因空闲退出并不绕过临时账户期限、主动退出和服务重启。为控制内存，每账户最多 64 个登录会话、整站最多 10000 个，超出时撤销最久未活动的会话。一个验证码只能用一次，多设备登录请等待下一组，设备需同步时间。
 - 各设备登录同一个账户即可看到同一收件箱。不同账户不能互相查看消息、文件；管理员备份包含整个站点数据。
 - 默认关闭公开注册。后台开启后，新账户默认有效 1 小时，可调整新账户有效期，也可延长已有临时账户。到期只停止访问，不自动删除永久消息。
 - 文件可多选排队、拖放或粘贴剪贴板图片；`Ctrl/⌘ + Enter` 发送。支持复制文字、复制图片和下载；复制图片需要 HTTPS 或 localhost，以及浏览器支持。GIF 复制为静态首帧，下载保留动图。
