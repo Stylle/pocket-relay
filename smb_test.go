@@ -17,6 +17,8 @@ func TestSMBIntegration(t *testing.T) {
 	defer cancel()
 	s := store{Kind: "smb", URL: "127.0.0.1", Root: "relay/pocket-test", User: "guest"}
 	if e := a.storeProbe(ctx, s); e != nil {
+		out, _ := a.remoteCommand(ctx, s, "lsd", "pr:").CombinedOutput()
+		t.Logf("Isolated fixture diagnostic: %s", out)
 		t.Fatal("SMB write/delete probe failed", e)
 	}
 	source := filepath.Join(a.dir, "tmp", "smb-source")

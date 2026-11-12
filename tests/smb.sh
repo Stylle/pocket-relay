@@ -27,6 +27,7 @@ read only = no
 force user = nobody
 EOF
 sudo smbd --configfile="$fixture/smb.conf" --daemon
+for n in $(seq 1 20); do if timeout 1 bash -c '</dev/tcp/127.0.0.1/445' 2>/dev/null; then break; fi; sleep 1; done
 export POCKET_SMB_TEST=1
 # setup-go resides in the invoking runner's PATH; sudo preserves it explicitly.
 GO_BIN=$(command -v go || find /opt/hostedtoolcache/go -path '*/bin/go' | sort -V | tail -n1)
