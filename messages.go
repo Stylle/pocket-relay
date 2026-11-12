@@ -161,6 +161,11 @@ func (a *app) sendMessage(w http.ResponseWriter, r *http.Request) {
 	a.gate.RLock()
 	defer a.gate.RUnlock()
 	s := a.config()
+	tg, tgRevision, tgError := a.telegramConfig()
+	if tgError != nil {
+		fail(w, 500, "机器人配置无法读取，请检查完整 data 备份")
+		return
+	}
 	var text, device, fileID, name, kind, storeID, digest string
 	var expires, size int64
 	var concealed bool
@@ -347,6 +352,12 @@ func (a *app) sendMessage(w http.ResponseWriter, r *http.Request) {
 	if e != nil {
 		fail(w, 500, "保存失败")
 		return
+	}
+	if tg.Enabled && tg.Send && tg.UserID == u.ID && (!concealed || tg.IncludeConcealed) {
+		if _, e = tx.Exec(`INSERT INTO telegram_outbox(message_id,revision) SELECT ?,? WHERE EXISTS(SELECT 1 FROM telegram WHERE id=1 AND revision=?)`, id, tgRevision, tgRevision); e != nil {
+			fail(w, 500, "保存发送队列失败")
+			return
+		}
 	}
 	if e = tx.Commit(); e != nil {
 		fail(w, 500, "保存失败")

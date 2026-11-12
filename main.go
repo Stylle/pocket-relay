@@ -66,6 +66,12 @@ type app struct {
 	restart     chan struct{}
 	maintenance bool
 	transfers   chan struct{}
+	tgMu        sync.Mutex
+	tgConfigMu  sync.Mutex
+	tgWake      chan struct{}
+	tgCancel    context.CancelFunc
+	tgHTTP      *http.Client
+	tgBase      string // Only overridden by isolated tests; never configurable through the API.
 }
 type settings struct {
 	Public             bool   `json:"public_registration"`
@@ -114,6 +120,9 @@ func openApp(dir string) (*app, error) {
 	}
 	db.SetMaxOpenConns(1)
 	a := &app{db: db, dir: dir, key: key, sessions: map[string]session{}, pending: map[string]enrollment{}, tickets: map[string]ticket{}, attempts: map[string]bucket{}, restart: make(chan struct{}), transfers: make(chan struct{}, 4)}
+	a.tgWake = make(chan struct{}, 1)
+	a.tgHTTP = &http.Client{Timeout: 70 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	a.tgBase = "https://api.telegram.org"
 	schema := `PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
  CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,name TEXT UNIQUE NOT NULL,secret TEXT NOT NULL,admin INTEGER NOT NULL,expires INTEGER NOT NULL,last_step INTEGER NOT NULL DEFAULT -1);
  CREATE TABLE IF NOT EXISTS config(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL);
@@ -122,6 +131,10 @@ func openApp(dir string) (*app, error) {
  CREATE INDEX IF NOT EXISTS messages_user_created ON messages(user_id,created);
  CREATE TABLE IF NOT EXISTS files(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),store_id TEXT NOT NULL,name TEXT NOT NULL,mime TEXT NOT NULL,size INTEGER NOT NULL,sha256 TEXT NOT NULL,deleted INTEGER NOT NULL DEFAULT 0);
  CREATE INDEX IF NOT EXISTS files_user ON files(user_id);`
+	schema += `CREATE TABLE IF NOT EXISTS telegram(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL,revision TEXT NOT NULL,next_update INTEGER NOT NULL DEFAULT 0,last_error TEXT NOT NULL DEFAULT '',receive_error TEXT NOT NULL DEFAULT '',send_error TEXT NOT NULL DEFAULT '',received INTEGER NOT NULL DEFAULT 0,sent INTEGER NOT NULL DEFAULT 0);
+ CREATE TABLE IF NOT EXISTS telegram_inbox(bot TEXT NOT NULL,update_id INTEGER NOT NULL,PRIMARY KEY(bot,update_id));
+ CREATE TABLE IF NOT EXISTS telegram_outbox(message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,revision TEXT NOT NULL,step INTEGER NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,available INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0);
+ CREATE INDEX IF NOT EXISTS telegram_ready ON telegram_outbox(failed,available);`
 	if _, e = db.Exec(schema); e != nil {
 		db.Close()
 		return nil, e
@@ -264,6 +277,10 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("GET /file/{id}", a.download)
 	mux.HandleFunc("GET /api/admin", a.adminGet)
 	mux.HandleFunc("PUT /api/admin", a.adminSave)
+	mux.HandleFunc("GET /api/admin/telegram", a.telegramGet)
+	mux.HandleFunc("PUT /api/admin/telegram", a.telegramSave)
+	mux.HandleFunc("POST /api/admin/telegram/test", a.telegramTest)
+	mux.HandleFunc("POST /api/admin/telegram/retry", a.telegramRetry)
 	mux.HandleFunc("POST /api/admin/storage", a.addStore)
 	mux.HandleFunc("POST /api/admin/storage/test", a.testStore)
 	mux.HandleFunc("PUT /api/admin/users/{id}", a.updateUser)
@@ -321,6 +338,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go a.janitor(ctx)
+	var telegramWorkers sync.WaitGroup
+	telegramWorkers.Add(1)
+	go func() { defer telegramWorkers.Done(); a.runTelegram(ctx) }()
+	defer func() { stop(); telegramWorkers.Wait() }()
 	server := &http.Server{Addr: address, Handler: a.handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
 	go func() {
 		select {

@@ -156,7 +156,7 @@
             </div>
             <span class="intro-symbol">↗</span>
           </div>
-          <form id="search-form" class="search-bar" role="search">
+          <form id="search-form" class="search-bar" role="search" hidden>
             <label class="search-text"
               >搜索全部文字记录<input
                 id="search-text"
@@ -314,6 +314,70 @@
               关闭后只显示文件名，点击“加载图片”才请求图片；不影响手动下载与复制。
             </p>
             <button class="primary">保存设置</button>
+          </form>
+          <form id="telegram-form" class="settings-card">
+            <h3>Telegram 机器人</h3>
+            <p class="muted small">
+              默认关闭；一个专用机器人绑定一个站内账户和一个 Telegram
+              私聊。无需公网回调。
+            </p>
+            <label class="check"
+              ><input id="tg-enabled" type="checkbox" />开启 Telegram
+              同步</label
+            >
+            <div class="form-grid">
+              <label>归属账户<select id="tg-user"></select></label>
+              <label
+                >私聊 Chat ID<input
+                  id="tg-chat"
+                  inputmode="numeric"
+                  placeholder="先向自己的机器人发送 /start，再点击检测"
+              /></label>
+            </div>
+            <label
+              >Bot Token<input
+                id="tg-token"
+                type="password"
+                autocomplete="new-password"
+                placeholder="从 @BotFather 获取；已保存后留空表示不修改"
+            /></label>
+            <div class="button-row">
+              <button id="tg-test" type="button" class="secondary">
+                检测连接 / 识别私聊 ID</button
+              ><select
+                id="tg-detected"
+                aria-label="检测到的私聊"
+                hidden
+              ></select>
+            </div>
+            <label class="check"
+              ><input id="tg-receive" type="checkbox" checked />接收 TG
+              消息到网站</label
+            >
+            <label class="check"
+              ><input id="tg-send" type="checkbox" checked />网站新消息发送到
+              TG</label
+            >
+            <label class="check"
+              ><input
+                id="tg-private"
+                type="checkbox"
+              />同时转发隐私遮挡消息（含正文与附件）</label
+            >
+            <p class="warning">
+              开启发送意味着将消息交给 Telegram
+              保存。网页删除、到期或遮挡不会删除 TG
+              副本；该同步不是端到端加密。普通接口接收附件最多 20
+              MB，发送附件最多 50
+              MB。切换配置会清空旧发送队列，不补发网站历史。仅限自用私聊，不接收其他用户或群聊信息。
+            </p>
+            <div class="button-row">
+              <button class="primary">保存机器人设置</button
+              ><button id="tg-retry" class="secondary" type="button">
+                重试失败发送
+              </button>
+            </div>
+            <p id="tg-status" class="muted small" role="status">尚未开启</p>
           </form>
           <form id="storage-form" class="settings-card">
             <h3>添加远程存储</h3>

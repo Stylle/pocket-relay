@@ -261,6 +261,7 @@ $("auth-form").onsubmit = async (e) => {
   }
 };
 function logoutLocal() {
+  $("tg-token").value = "";
   state.generation++;
   state.revealed.clear();
   state.loadedImages.clear();
@@ -314,6 +315,7 @@ async function setView(view) {
       ? "历史已折叠；搜索默认覆盖全部记录。"
       : "搜索默认覆盖全部文字记录。";
   state.view = view;
+  $("search-form").hidden = view !== "all";
   $("workspace").classList.remove("menu-open");
   document
     .querySelectorAll("[data-view]")
@@ -591,7 +593,7 @@ $("search-period").onchange = () => {
   $("search-to").required = custom;
 };
 $("clear-search").onclick = () =>
-  setView("messages").catch((e) => toast(e.message, true));
+  setView("all").catch((e) => toast(e.message, true));
 $("search-form").onsubmit = async (event) => {
   event.preventDefault();
   const query = new URLSearchParams();
@@ -618,7 +620,9 @@ $("search-form").onsubmit = async (event) => {
   state.filters = query.toString();
   // A global text search must not silently retain the file-only view filter.
   state.view = "all";
-  document.querySelectorAll("[data-view]").forEach(b => b.classList.toggle("active", b.dataset.view === "all"));
+  document
+    .querySelectorAll("[data-view]")
+    .forEach((b) => b.classList.toggle("active", b.dataset.view === "all"));
   state.generation++;
   state.polling = false;
   state.older = [];
@@ -918,8 +922,130 @@ async function send() {
   }
 }
 $("send").onclick = send;
+let telegramRevision = "";
+function showTelegramStatus(result) {
+  const cfg = result.config || {};
+  const pieces = [cfg.enabled ? "已开启" : "已关闭"];
+  if (cfg.enabled)
+    pieces.push(
+      [cfg.receive ? "接收" : "", cfg.send ? "发送" : ""]
+        .filter(Boolean)
+        .join(" / "),
+    );
+  pieces.push(
+    "待发送 " + (result.pending || 0),
+    "失败 " + (result.failed || 0),
+  );
+  if (result.received) pieces.push("最近接收 " + date(result.received * 1000));
+  if (result.sent) pieces.push("最近发送 " + date(result.sent * 1000));
+  if (result.last_error) pieces.push(result.last_error);
+  $("tg-status").textContent = pieces.join(" · ");
+}
+async function loadTelegram() {
+  const result = await json("/api/admin/telegram");
+  const cfg = result.config || {};
+  telegramRevision = result.revision || "";
+  $("tg-enabled").checked = !!cfg.enabled;
+  $("tg-receive").checked = result.configured ? !!cfg.receive : true;
+  $("tg-send").checked = result.configured ? !!cfg.send : true;
+  $("tg-private").checked = !!cfg.include_concealed;
+  $("tg-token").value = "";
+  $("tg-token").placeholder = result.configured
+    ? "Token 已加密保存；留空保持不变"
+    : "从 @BotFather 获取 Token";
+  $("tg-chat").value = cfg.chat_id || "";
+  $("tg-user").replaceChildren();
+  for (const user of state.admin.users) {
+    const option = node(
+      "option",
+      "",
+      user.name +
+        (user.expires && user.expires * 1000 <= Date.now() ? "（已过期）" : ""),
+    );
+    option.value = user.id;
+    $("tg-user").append(option);
+  }
+  $("tg-user").value = cfg.user_id || state.user.id;
+  $("tg-detected").hidden = true;
+  showTelegramStatus(result);
+}
+$("telegram-form").onsubmit = async (event) => {
+  event.preventDefault();
+  await action(event.submitter, async () => {
+    await json("/api/admin/telegram", {
+      method: "PUT",
+      body: JSON.stringify({
+        enabled: $("tg-enabled").checked,
+        receive: $("tg-receive").checked,
+        send: $("tg-send").checked,
+        include_concealed: $("tg-private").checked,
+        user_id: $("tg-user").value,
+        chat_id: $("tg-chat").value.trim(),
+        token: $("tg-token").value.trim(),
+        revision: telegramRevision,
+      }),
+    });
+    await loadTelegram();
+    toast("机器人设置已保存，已清空旧发送队列");
+  });
+};
+$("tg-test").onclick = () =>
+  action($("tg-test"), async () => {
+    const result = await json("/api/admin/telegram/test", {
+      method: "POST",
+      body: JSON.stringify({ token: $("tg-token").value.trim() }),
+    });
+    const chats = result.chats || [];
+    $("tg-detected").replaceChildren();
+    const placeholder = node("option", "", "选择要绑定的私聊 ID");
+    placeholder.value = "";
+    $("tg-detected").append(placeholder);
+    for (const id of chats) {
+      const option = node("option", "", id);
+      option.value = id;
+      $("tg-detected").append(option);
+    }
+    $("tg-detected").hidden = !chats.length;
+    if (chats.length === 1) {
+      $("tg-chat").value = chats[0];
+      $("tg-detected").value = chats[0];
+    }
+    $("tg-status").textContent = chats.length
+      ? "连接正常，已检测到私聊 ID；请核对后保存。"
+      : "连接正常。请在 Telegram 向 @" +
+        (result.username || "你的机器人") +
+        " 发送 /start 后重新检测。启用期间只显示已绑定 ID，修改绑定请先关闭同步。";
+  });
+$("tg-detected").onchange = () => {
+  if ($("tg-detected").value) $("tg-chat").value = $("tg-detected").value;
+};
+$("tg-retry").onclick = () =>
+  action($("tg-retry"), async () => {
+    await json("/api/admin/telegram/retry", { method: "POST" });
+    showTelegramStatus(await json("/api/admin/telegram"));
+    toast("已安排重试");
+  });
+let telegramStatusBusy = false;
+setInterval(async () => {
+  if (
+    !state.token ||
+    state.view !== "admin" ||
+    document.hidden ||
+    telegramStatusBusy
+  )
+    return;
+  telegramStatusBusy = true;
+  try {
+    showTelegramStatus(await json("/api/admin/telegram"));
+  } catch {
+  } finally {
+    telegramStatusBusy = false;
+  }
+}, 10000);
+
 async function loadAdmin() {
   state.admin = await json("/api/admin");
+  await loadTelegram();
   const s = state.admin.settings;
   $("public-registration").checked = s.public_registration;
   $("auto-load-images").checked = s.auto_load_images !== false;

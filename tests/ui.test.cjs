@@ -36,6 +36,15 @@ function fixture(
   t.after(() => dom.window.close());
   const w = dom.window;
   const calls = [];
+  let tgConfig = {
+    enabled: false,
+    receive: true,
+    send: true,
+    include_concealed: false,
+    user_id: "owner",
+    chat_id: "",
+  };
+  let tgConfigured = false;
   w.Headers = Headers;
   w.performance.getEntriesByType = () => [{ type: navigation }];
   if (sessionToken)
@@ -82,6 +91,22 @@ function fixture(
               max_file_mb: 256,
               auto_load_images: autoLoadImages,
             };
+    else if (path === "/api/admin/telegram") {
+      if (opts.method === "PUT") {
+        const body = JSON.parse(opts.body);
+        tgConfigured = tgConfigured || !!body.token;
+        tgConfig = { ...body, token: "" };
+        value = { ok: true };
+      } else
+        value = {
+          config: tgConfig,
+          configured: tgConfigured,
+          revision: "test-revision",
+          pending: 0,
+          failed: 0,
+        };
+    } else if (path === "/api/admin/telegram/test")
+      value = { username: "test_only_bot", chats: ["42"] };
     else if (path === "/api/admin")
       value =
         opts.method === "PUT"
@@ -296,14 +321,55 @@ test("static UI contracts include viewport, narrow-screen layout and no external
     );
 });
 
+test("Telegram controls default off, identify chat and independently save directions", async (t) => {
+  const f = fixture(t);
+  await settle();
+  await login(f);
+  await f.w.__test.setView("admin");
+  assert.equal(f.$("tg-enabled").checked, false);
+  assert.equal(f.$("tg-private").checked, false);
+  f.$("tg-token").value = "test-only-token";
+  f.$("tg-test").click();
+  await settle();
+  assert.equal(f.$("tg-chat").value, "42");
+  assert.equal(f.$("tg-enabled").checked, false);
+  f.$("tg-enabled").checked = true;
+  f.$("tg-send").checked = false;
+  f.$("telegram-form").dispatchEvent(
+    new f.w.SubmitEvent("submit", {
+      cancelable: true,
+      submitter: f.$("telegram-form").querySelector("button.primary"),
+    }),
+  );
+  await settle();
+  const call = f.calls.find(
+    (c) => c.path === "/api/admin/telegram" && c.opts.method === "PUT",
+  );
+  assert.ok(call);
+  const body = JSON.parse(call.opts.body);
+  assert.equal(body.enabled, true);
+  assert.equal(body.receive, true);
+  assert.equal(body.send, false);
+  assert.equal(body.include_concealed, false);
+  assert.equal(body.user_id, "owner");
+  assert.equal(body.chat_id, "42");
+  assert.equal(body.revision, "test-revision");
+  assert.equal(f.$("tg-token").value, "");
+  assert.equal(f.w.localStorage.getItem("pr-token"), null);
+});
+
 test("history is folded at login and search defaults to all records with custom dates", async (t) => {
   const f = fixture(t);
   await settle();
   await login(f);
   assert.ok(f.calls.some((c) => c.path === "/api/messages?scope=current"));
+  assert.equal(f.$("search-form").hidden, true);
   await f.w.__test.setView("all");
+  assert.equal(f.$("search-form").hidden, false);
   assert.ok(f.calls.some((c) => c.path === "/api/messages?scope=all"));
   await f.w.__test.setView("files");
+  assert.equal(f.$("search-form").hidden, true);
+  await f.w.__test.setView("all");
   f.$("search-text").value = "测试 %_";
   f.$("search-period").value = "custom";
   f.$("search-period").dispatchEvent(new f.w.Event("change"));
@@ -325,7 +391,7 @@ test("history is folded at login and search defaults to all records with custom 
   f.$("clear-search").click();
   await settle();
   assert.equal(f.w.__test.state.filters, "");
-  assert.equal(f.w.__test.state.view, "messages");
+  assert.equal(f.w.__test.state.view, "all");
 });
 
 test("concealed text loads only on reveal and is concealed again after a page reload", async (t) => {

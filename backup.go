@@ -307,6 +307,28 @@ func validateBackup(dir string) error {
 		}
 	}
 	rows.Close()
+	// Backups before Telegram support do not have this table.
+	var hasTelegram int
+	if e = db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='telegram'`).Scan(&hasTelegram); e != nil {
+		return e
+	}
+	if hasTelegram > 0 {
+		var encoded string
+		e = db.QueryRow(`SELECT value FROM telegram WHERE id=1`).Scan(&encoded)
+		if e != nil && !errors.Is(e, sql.ErrNoRows) {
+			return e
+		}
+		if e == nil {
+			plain, err := unseal(key, encoded)
+			if err != nil {
+				return errors.New("invalid Telegram secret")
+			}
+			var cfg telegramConfig
+			if json.Unmarshal([]byte(plain), &cfg) != nil {
+				return errors.New("invalid Telegram configuration")
+			}
+		}
+	}
 	var admins int
 	if e = db.QueryRow(`SELECT COUNT(*) FROM users WHERE admin=1 AND expires=0`).Scan(&admins); e != nil || admins != 1 {
 		return errors.New("invalid administrator")
