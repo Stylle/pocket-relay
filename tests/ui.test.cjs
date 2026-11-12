@@ -303,6 +303,7 @@ test("history is folded at login and search defaults to all records with custom 
   assert.ok(f.calls.some((c) => c.path === "/api/messages?scope=current"));
   await f.w.__test.setView("all");
   assert.ok(f.calls.some((c) => c.path === "/api/messages?scope=all"));
+  await f.w.__test.setView("files");
   f.$("search-text").value = "测试 %_";
   f.$("search-period").value = "custom";
   f.$("search-period").dispatchEvent(new f.w.Event("change"));
@@ -317,6 +318,8 @@ test("history is folded at login and search defaults to all records with custom 
     .at(-1);
   const query = new URL(last.path, "http://localhost").searchParams;
   assert.equal(query.get("scope"), "all");
+  assert.equal(query.has("files"), false);
+  assert.equal(f.w.__test.state.view, "all");
   assert.equal(query.get("q"), "测试 %_");
   assert.ok(Number(query.get("from")) < Number(query.get("to")));
   f.$("clear-search").click();

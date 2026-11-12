@@ -11,7 +11,7 @@
 ```yaml
 services:
   pocket-relay:
-    image: stylle/pocket-relay:latest # 公共镜像，无需登录；可固定为 v0.2.1
+    image: stylle/pocket-relay:latest # 公共镜像，无需登录；可固定为 v0.2.2
     container_name: pocket-relay     # 可省略，也可改名
     restart: always                 # 建议保留；恢复备份需要重启
     ports:

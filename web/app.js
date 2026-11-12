@@ -616,6 +616,9 @@ $("search-form").onsubmit = async (event) => {
     query.set("to", to);
   }
   state.filters = query.toString();
+  // A global text search must not silently retain the file-only view filter.
+  state.view = "all";
+  document.querySelectorAll("[data-view]").forEach(b => b.classList.toggle("active", b.dataset.view === "all"));
   state.generation++;
   state.polling = false;
   state.older = [];
