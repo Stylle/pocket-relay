@@ -444,7 +444,7 @@ func (a *app) download(w http.ResponseWriter, r *http.Request) {
 	s, sessionOK := a.sessions[t.Session]
 	a.mu.Unlock()
 	id := r.PathValue("id")
-	if !ok || !sessionOK || sessionExpired(s, a.config().SessionIdleMinutes, time.Now()) || t.File != id || time.Now().After(t.Expires) {
+	if !ok || !sessionOK || sessionExpired(s, a.config().SessionIdleMinutes, time.Now()) || (s.RememberID != "" && !a.rememberValid(s.RememberID, s.User)) || t.File != id || time.Now().After(t.Expires) {
 		fail(w, 401, "下载链接已过期，请重新点击下载")
 		return
 	}
@@ -515,6 +515,7 @@ func (a *app) janitor(ctx context.Context) {
 	}
 }
 func (a *app) cleanup(ctx context.Context) {
+	a.db.ExecContext(ctx, `DELETE FROM remembered_sessions WHERE expires<=?`, now())
 	idleMinutes := a.config().SessionIdleMinutes
 	a.mu.Lock()
 	for k, v := range a.sessions {

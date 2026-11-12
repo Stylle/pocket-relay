@@ -82,6 +82,8 @@
                 required
             /></label>
             <p id="auth-error" class="error" role="alert"></p>
+            <label class="check"><input id="remember-login" type="checkbox" />记住登录状态（7 天）</label>
+            <p class="small muted">仅在自己的设备勾选。7 天内重新打开网页无需验证，主动退出立即失效；临时账户到期仍需重新验证。</p>
             <button id="auth-submit" class="primary wide" type="submit">
               进入我的空间 <span>→</span>
             </button>
@@ -91,7 +93,7 @@
           </button>
           <p id="guest-notice" class="small muted"></p>
           <div class="auth-foot">
-            验证器登录 · 页面重新打开后需再次验证<br />请勿向他人提供验证码或绑定密钥。
+            验证器登录 · 可选择记住登录 7 天<br />请勿向他人提供验证码或绑定密钥。
           </div>
         </div>
       </section>
@@ -223,7 +225,7 @@
           <div class="settings-card">
             <h3>关于隐私与复制</h3>
             <p>
-              同一标签页刷新保留登录，重新打开页面需验证；后台可配置无操作超时。设备名和账户名会保存在浏览器，验证器密钥不会。
+              勾选「记住登录状态」后固定 7 天内免验证，支持重新打开浏览器和服务重启；不勾选时，同一标签页刷新保留登录，其他情况与后台空闲超时规则保持不变。主动退出撤销当前浏览器的记住状态。
             </p>
             <p>
               浏览器复制图片、剪贴板粘贴需要 HTTPS 或
@@ -291,7 +293,7 @@
             </div>
             <p class="muted small">
               默认 15
-              分钟；后台同步不算操作。刷新保留登录，重新打开页面需验证；主动退出立即撤销登录。临时账户到期和服务重启仍需验证。浏览器恢复会话存在平台差异。
+              分钟；后台同步不算操作。此策略仅作用于未勾选「记住登录状态」的会话。勾选后固定 7 天有效，不受空闲超时影响；主动退出或临时账户到期仍立即失效。
             </p>
             <label
               >消息来源显示模板<input

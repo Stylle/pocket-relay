@@ -159,13 +159,22 @@ func (a *app) enroll(w http.ResponseWriter, r *http.Request) {
 	reply(w, 200, map[string]any{"enrollment": id, "secret": secret, "qr": "data:image/png;base64," + base64.StdEncoding.EncodeToString(png), "uri": uri})
 }
 func (a *app) issue(u user) map[string]any {
+	return a.issueSession(u, "", time.Time{})
+}
+func (a *app) issueSession(u user, rememberID string, rememberUntil time.Time) map[string]any {
 	token := randomID() + randomID()
 	expiry := time.Time{}
 	if u.Expires > 0 {
 		expiry = time.Unix(u.Expires, 0)
 	}
+	if !rememberUntil.IsZero() && (expiry.IsZero() || rememberUntil.Before(expiry)) {
+		expiry = rememberUntil
+	}
 	active := time.Now()
 	idleMinutes := a.config().SessionIdleMinutes
+	if rememberID != "" {
+		idleMinutes = 0
+	}
 	a.mu.Lock()
 	var oldestUser, oldestGlobal string
 	count := 0
@@ -190,13 +199,17 @@ func (a *app) issue(u user) map[string]any {
 	if len(a.sessions) >= 10000 {
 		delete(a.sessions, oldestGlobal)
 	}
-	a.sessions[token] = session{User: u.ID, Started: active, Expires: expiry, LastActive: active}
+	a.sessions[token] = session{User: u.ID, Started: active, Expires: expiry, LastActive: active, RememberID: rememberID}
 	a.mu.Unlock()
-	return map[string]any{"token": token, "user": u, "started_at": active.UnixMilli(), "idle_minutes": idleMinutes, "last_active": active.UnixMilli(), "server_time": active.UnixMilli()}
+	result := map[string]any{"token": token, "user": u, "started_at": active.UnixMilli(), "idle_minutes": idleMinutes, "last_active": active.UnixMilli(), "server_time": active.UnixMilli(), "remembered": rememberID != ""}
+	if !expiry.IsZero() {
+		result["expires_at"] = expiry.UnixMilli()
+	}
+	return result
 }
 
 func sessionExpired(s session, minutes int, at time.Time) bool {
-	return (!s.Expires.IsZero() && !at.Before(s.Expires)) || (minutes > 0 && (s.LastActive.IsZero() || !at.Before(s.LastActive.Add(time.Duration(minutes)*time.Minute))))
+	return (!s.Expires.IsZero() && !at.Before(s.Expires)) || (s.RememberID == "" && minutes > 0 && (s.LastActive.IsZero() || !at.Before(s.LastActive.Add(time.Duration(minutes)*time.Minute))))
 }
 
 // Background polling and previews do not renew the idle timeout.
@@ -213,7 +226,15 @@ func (a *app) sessionInfo(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "请重新验证")
 		return
 	}
-	reply(w, 200, map[string]any{"user": u, "started_at": s.Started.UnixMilli(), "idle_minutes": a.config().SessionIdleMinutes, "last_active": s.LastActive.UnixMilli(), "server_time": time.Now().UnixMilli()})
+	minutes := a.config().SessionIdleMinutes
+	if s.RememberID != "" {
+		minutes = 0
+	}
+	result := map[string]any{"user": u, "started_at": s.Started.UnixMilli(), "idle_minutes": minutes, "last_active": s.LastActive.UnixMilli(), "server_time": time.Now().UnixMilli(), "remembered": s.RememberID != ""}
+	if !s.Expires.IsZero() {
+		result["expires_at"] = s.Expires.UnixMilli()
+	}
+	reply(w, 200, result)
 }
 
 func (a *app) sessionActivity(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +255,14 @@ func (a *app) sessionActivity(w http.ResponseWriter, r *http.Request) {
 	s.LastActive = active
 	a.sessions[token] = s
 	a.mu.Unlock()
-	reply(w, 200, map[string]any{"idle_minutes": minutes, "last_active": active.UnixMilli(), "server_time": active.UnixMilli()})
+	if s.RememberID != "" {
+		minutes = 0
+	}
+	result := map[string]any{"idle_minutes": minutes, "last_active": active.UnixMilli(), "server_time": active.UnixMilli(), "remembered": s.RememberID != ""}
+	if !s.Expires.IsZero() {
+		result["expires_at"] = s.Expires.UnixMilli()
+	}
+	reply(w, 200, result)
 }
 func (a *app) confirm(w http.ResponseWriter, r *http.Request) {
 	if a.limited(r) {
@@ -244,6 +272,7 @@ func (a *app) confirm(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Enrollment string `json:"enrollment"`
 		Code       string `json:"code"`
+		Remember   bool   `json:"remember"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -294,7 +323,7 @@ func (a *app) confirm(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	delete(a.pending, in.Enrollment)
 	a.mu.Unlock()
-	reply(w, 201, a.issue(u))
+	a.finishLogin(w, r, u, in.Remember, 201)
 }
 func (a *app) login(w http.ResponseWriter, r *http.Request) {
 	if a.limited(r) {
@@ -302,8 +331,9 @@ func (a *app) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Name string `json:"name"`
-		Code string `json:"code"`
+		Name     string `json:"name"`
+		Code     string `json:"code"`
+		Remember bool   `json:"remember"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -342,5 +372,5 @@ func (a *app) login(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "验证码已使用，请等待下一组")
 		return
 	}
-	reply(w, 200, a.issue(u))
+	a.finishLogin(w, r, u, in.Remember, 200)
 }

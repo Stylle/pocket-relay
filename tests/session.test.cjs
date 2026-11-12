@@ -24,3 +24,10 @@ test('blocked or malformed storage fails closed without breaking login',()=>{
  const s=new Session(blocked,'reload');assert.equal(s.restore(),null);s.accept('token',{idle_minutes:15});assert.equal(s.persist(),false);
  const store=storage();store.setItem('pr-session','invalid');assert.equal(new Session(store,'reload').restore(),null);
 });
+test('remembered login ignores idle but has a fixed absolute deadline',()=>{
+ let now=100000;const s=new Session(storage(),'navigate',()=>now);
+ s.accept('memory-token',{remembered:true,idle_minutes:0,expires_at:now+7*86400000,server_time:now});
+ now+=6*86400000;assert.equal(s.expired(),false);
+ now+=86400000;assert.equal(s.expired(),true);assert.equal(s.input(),false);
+ s.clear();assert.equal(s.remembered,false);assert.equal(s.expiresAt,0);
+});

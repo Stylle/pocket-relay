@@ -104,6 +104,7 @@ function date(n) {
 async function api(path, options = {}) {
   const requestToken = state.token;
   const headers = new Headers(options.headers);
+  headers.set("X-Relay-Session", "1");
   if (state.token) headers.set("Authorization", "Bearer " + state.token);
   if (
     options.body &&
@@ -211,6 +212,13 @@ async function boot() {
         }
       }
     }
+    if (!state.status.setup) {
+      try {
+        const result = await json("/api/session/restore", { method: "POST" });
+        await enterWorkspace(result);
+        return;
+      } catch (_) {}
+    }
     authMode(state.status.setup ? "register" : "login");
   } catch (e) {
     $("auth-error").textContent = "连接服务失败，请刷新重试。";
@@ -248,8 +256,8 @@ $("auth-form").onsubmit = async (e) => {
         method: "POST",
         body: JSON.stringify(
           state.enrollment
-            ? { enrollment: state.enrollment, code: $("code").value }
-            : { name, code: $("code").value },
+            ? { enrollment: state.enrollment, code: $("code").value, remember: $("remember-login").checked }
+            : { name, code: $("code").value, remember: $("remember-login").checked },
         ),
       },
     );
@@ -287,9 +295,8 @@ function logoutLocal() {
 $("logout").onclick = async () => {
   try {
     await json("/api/logout", { method: "POST" });
-  } finally {
     logoutLocal();
-  }
+  } catch (_) { toast("退出未完成，请恢复网络后重试，避免记住状态仍然有效。", true); }
 };
 document
   .querySelectorAll("[data-view]")
@@ -1250,13 +1257,13 @@ $("restore-file").onchange = async () => {
   }
 };
 
-function expireSession(message = "长时间无操作，请重新验证") {
+function expireSession(message = browserSession.remembered ? "记住的登录已到期，请重新验证" : "长时间无操作，请重新验证") {
   const token = state.token;
   if (!token) return;
   logoutLocal();
   fetch("/api/logout", {
     method: "POST",
-    headers: { Authorization: "Bearer " + token },
+    headers: { Authorization: "Bearer " + token, "X-Relay-Session": "1" },
     keepalive: true,
   }).catch(() => {});
   $("auth-error").textContent = message;
@@ -1328,8 +1335,9 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) syncSessionPolicy();
 });
 window.addEventListener("pageshow", (event) => {
-  if (event.persisted && state.token)
+  if (event.persisted && state.token && !browserSession.remembered)
     expireSession("页面已重新打开，请重新验证");
+  else if (event.persisted && state.token) syncSessionPolicy();
 });
 
 boot();

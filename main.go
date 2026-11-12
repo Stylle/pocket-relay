@@ -35,6 +35,7 @@ type user struct {
 	Expires int64  `json:"expires"`
 }
 type session struct {
+	RememberID string
 	User       string
 	Started    time.Time
 	Expires    time.Time
@@ -135,6 +136,8 @@ func openApp(dir string) (*app, error) {
  CREATE TABLE IF NOT EXISTS telegram_inbox(bot TEXT NOT NULL,update_id INTEGER NOT NULL,PRIMARY KEY(bot,update_id));
  CREATE TABLE IF NOT EXISTS telegram_outbox(message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,revision TEXT NOT NULL,step INTEGER NOT NULL DEFAULT 0,attempts INTEGER NOT NULL DEFAULT 0,available INTEGER NOT NULL DEFAULT 0,failed INTEGER NOT NULL DEFAULT 0);
  CREATE INDEX IF NOT EXISTS telegram_ready ON telegram_outbox(failed,available);`
+	schema += `CREATE TABLE IF NOT EXISTS remembered_sessions(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,created INTEGER NOT NULL,expires INTEGER NOT NULL);
+ CREATE INDEX IF NOT EXISTS remembered_user ON remembered_sessions(user_id,created);`
 	if _, e = db.Exec(schema); e != nil {
 		db.Close()
 		return nil, e
@@ -217,6 +220,10 @@ func (a *app) auth(w http.ResponseWriter, r *http.Request) (user, bool) {
 		return user{}, false
 	}
 	a.mu.Unlock()
+	if s.RememberID != "" && !a.rememberValid(s.RememberID, s.User) {
+		fail(w, 401, "记住的登录已失效，请重新验证")
+		return user{}, false
+	}
 	u, e := a.findUser(s.User)
 	if e != nil {
 		fail(w, 401, "账户已过期或不存在")
@@ -262,13 +269,9 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("POST /api/enroll/confirm", a.confirm)
 	mux.HandleFunc("POST /api/login", a.login)
 	mux.HandleFunc("GET /api/session", a.sessionInfo)
+	mux.HandleFunc("POST /api/session/restore", a.restoreRemembered)
 	mux.HandleFunc("POST /api/session/activity", a.sessionActivity)
-	mux.HandleFunc("POST /api/logout", func(w http.ResponseWriter, r *http.Request) {
-		a.mu.Lock()
-		delete(a.sessions, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
-		a.mu.Unlock()
-		reply(w, 200, map[string]bool{"ok": true})
-	})
+	mux.HandleFunc("POST /api/logout", a.logout)
 	mux.HandleFunc("GET /api/messages", a.listMessages)
 	mux.HandleFunc("POST /api/messages", a.sendMessage)
 	mux.HandleFunc("GET /api/messages/{id}/text", a.messageText)

@@ -26,6 +26,7 @@ function fixture(
     navigation = "navigate",
     sessionToken = "",
     autoLoadImages = true,
+    remembered = false,
   } = {},
 ) {
   const dom = new JSDOM(html, {
@@ -57,14 +58,17 @@ function fixture(
   w.fetch = async (path, opts = {}) => {
     calls.push({ path, opts });
     let value;
-    if (path === "/api/status")
+    if (path === "/api/session/restore") {
+      if (!remembered) return new Response(JSON.stringify({error:"not remembered"}), {status:401});
+      value = {token:"remembered-memory-token",user,remembered:true,idle_minutes:0,expires_at:Date.now()+7*86400000,server_time:Date.now(),last_active:Date.now()};
+    } else if (path === "/api/status")
       value = {
         setup,
         public_registration: publicRegistration,
         guest_hours: 1,
       };
     else if (path === "/api/login" || path === "/api/enroll/confirm")
-      value = { token: "test-only-bearer", user };
+      value = { token: "test-only-bearer", user, remembered: JSON.parse(opts.body).remember === true, idle_minutes: JSON.parse(opts.body).remember ? 0 : 15 };
     else if (path === "/api/session")
       value = {
         user,
@@ -180,6 +184,33 @@ test("reload restores server-validated session, fresh navigation requires verifi
   await settle();
   assert.equal(fresh.$("workspace").hidden, true);
   assert.equal(fresh.w.sessionStorage.getItem("pr-session"), null);
+});
+
+test("remember checkbox is opt-in and remembered cookie restores a freshly opened page", async (t) => {
+  const ordinary = fixture(t);
+  await settle();
+  assert.equal(ordinary.$("remember-login").checked, false);
+  ordinary.$("remember-login").checked = true;
+  await login(ordinary);
+  const call = ordinary.calls.find(c => c.path === "/api/login");
+  assert.equal(JSON.parse(call.opts.body).remember, true);
+  assert.equal(ordinary.w.__test.browserSession.remembered, true);
+  const restored = fixture(t, { navigation: "navigate", remembered: true });
+  await settle();
+  assert.equal(restored.$("workspace").hidden, false);
+  assert.equal(restored.w.__test.browserSession.remembered, true);
+  const restoreCall = restored.calls.find(c => c.path === "/api/session/restore");
+  assert.equal(restoreCall.opts.method, "POST");
+  assert.equal(restoreCall.opts.headers.get("X-Relay-Session"), "1");
+  assert.equal(restored.calls.some(c => c.path === "/api/login"), false);
+  assert.equal(restored.w.localStorage.getItem("pr-session"), null);
+  const event = new restored.w.Event("pageshow");
+  Object.defineProperty(event, "persisted", { value: true });
+  restored.w.dispatchEvent(event);
+  assert.equal(restored.$("workspace").hidden, false);
+  restored.$("logout").click();
+  await settle();
+  assert.equal(restored.$("workspace").hidden, true);
 });
 test("idle expiry and back-forward cache restore lock the UI", async (t) => {
   const f = fixture(t);

@@ -173,6 +173,18 @@ func (a *app) exportBackup(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, "创建数据库快照失败")
 		return
 	}
+	// Website backups must not restore/revive previously revoked browser logins.
+	copyDB, copyErr := sql.Open("sqlite", snapshot)
+	if copyErr == nil {
+		_, copyErr = copyDB.Exec(`DELETE FROM remembered_sessions`)
+		if closeErr := copyDB.Close(); copyErr == nil {
+			copyErr = closeErr
+		}
+	}
+	if copyErr != nil {
+		fail(w, 500, "清理备份登录状态失败")
+		return
+	}
 	f, e := os.Create(filepath.Join(dir, "backup.zip"))
 	if e != nil {
 		fail(w, 507, "磁盘无法写入")

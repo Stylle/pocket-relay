@@ -5,6 +5,7 @@
     constructor(storage, navigation, clock=()=>Date.now()) {
       this.storage=storage; this.navigation=navigation; this.clock=clock;
       this.token=''; this.idleMinutes=15; this.lastActive=0;
+      this.remembered=false; this.expiresAt=0;
     }
     restore() {
       let record;
@@ -19,6 +20,8 @@
     }
     accept(token, info) {
       this.token=token;
+      this.remembered=info.remembered===true;
+      this.expiresAt=Number.isFinite(info.expires_at)?this.clock()+info.expires_at-(Number.isFinite(info.server_time)?info.server_time:this.clock()):0;
       this.idleMinutes=Number.isInteger(info.idle_minutes)?info.idle_minutes:15;
       const elapsed=Number.isFinite(info.server_time)&&Number.isFinite(info.last_active)?Math.max(0,info.server_time-info.last_active):0;
       this.lastActive=this.clock()-elapsed;
@@ -27,9 +30,9 @@
     persist() {
       try { this.storage.setItem('pr-session',JSON.stringify({token:this.token})); return true; } catch { return false; }
     }
-    expired() { return !!this.token&&this.idleMinutes>0&&this.clock()-this.lastActive>=this.idleMinutes*60000; }
+    expired() { return !!this.token&&((this.expiresAt>0&&this.clock()>=this.expiresAt)||(!this.remembered&&this.idleMinutes>0&&this.clock()-this.lastActive>=this.idleMinutes*60000)); }
     input() { if(!this.token||this.expired())return false; this.lastActive=this.clock(); return true; }
-    clear() { this.token='';this.lastActive=0;try { this.storage.removeItem('pr-session'); } catch {} }
+    clear() { this.token='';this.lastActive=0;this.remembered=false;this.expiresAt=0;try { this.storage.removeItem('pr-session'); } catch {} }
   }
   root.RelaySession=RelaySession;
   if(typeof module!=='undefined')module.exports=RelaySession;
