@@ -5,9 +5,21 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 )
+
+func TestNestedMountTable(t *testing.T) {
+	for _, point := range []string{"/data/blobs", "/data/previous/other", `/data/space\040name`} {
+		if rejectNestedMounts("/data", strings.NewReader("42 31 8:1 / "+point+" rw - ext4 /dev/disk rw\n")) == nil {
+			t.Fatal("accepted nested mount", point)
+		}
+	}
+	if err := rejectNestedMounts("/data", strings.NewReader("42 31 8:1 / /data rw - ext4 /dev/disk rw\n43 31 8:1 / /database rw - ext4 /dev/disk rw\n")); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestRejectLinksAndBroadDirectories(t *testing.T) {
 	for _, dir := range []string{"/", "/etc", "/home", "/tmp"} {

@@ -4,7 +4,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -31,6 +33,19 @@ func prepare(dir string) error {
 	}
 	if !info.IsDir() {
 		return fmt.Errorf("data must not be a symlink")
+	}
+	dir, err = filepath.EvalSymlinks(dir)
+	if err != nil {
+		return err
+	}
+	mounts, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		return err
+	}
+	err = rejectNestedMounts(dir, mounts)
+	mounts.Close()
+	if err != nil {
+		return err
 	}
 	root, err := os.OpenRoot(dir)
 	if err != nil {
@@ -74,6 +89,25 @@ func prepare(dir string) error {
 		}
 		return nil
 	})
+}
+
+// Device numbers alone do not detect a bind mount from the same filesystem.
+// Check the mount table before changing any ownership, including data itself.
+func rejectNestedMounts(dir string, table io.Reader) error {
+	scanner := bufio.NewScanner(table)
+	scanner.Buffer(make([]byte, 4096), 1<<20)
+	unescape := strings.NewReplacer(`\040`, " ", `\011`, "\t", `\012`, "\n", `\134`, `\`)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 6 {
+			return fmt.Errorf("invalid mount table")
+		}
+		point := filepath.Clean(unescape.Replace(fields[4]))
+		if strings.HasPrefix(point, dir+"/") {
+			return fmt.Errorf("data contains a nested mount; refusing ownership changes")
+		}
+	}
+	return scanner.Err()
 }
 
 func main() {

@@ -59,6 +59,19 @@ jobs:
           docker restart relay-bind
           for n in $(seq 1 30); do curl -fsS http://127.0.0.1:28183/healthz && break || sleep 1; done
           curl -fsS http://127.0.0.1:28183/api/status | grep '"setup":true'
+      - name: Nested bind mounts cannot be modified by bootstrap
+        run: |
+          set -euo pipefail
+          data=$(mktemp -d)
+          outside=$(mktemp -d)
+          touch "$outside/unchanged"
+          before=$(stat -c '%u:%g:%a' "$outside/unchanged")
+          trap 'docker rm -f relay-nested' EXIT
+          if docker run --name relay-nested -v "$data:/data" -v "$outside:/data/blobs" pocket-relay:test; then
+            echo 'Unexpectedly accepted a nested mount'; exit 1
+          fi
+          docker logs relay-nested 2>&1 | grep 'nested mount'
+          test "$(stat -c '%u:%g:%a' "$outside/unchanged")" = "$before"
   smb:
     runs-on: ubuntu-latest
     steps:
