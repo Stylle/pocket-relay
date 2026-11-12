@@ -45,7 +45,7 @@ func (a *app) getStore(id string) (store, error) {
 	return s, e
 }
 func validateStore(s store) error {
-	if len(s.Name) > 100 || len(s.Password) > 1024 || strings.ContainsAny(s.User+s.Domain+s.Root+s.URL, "\r\n\x00") {
+	if len(s.Name) > 100 || len(s.Password) > 1024 || strings.ContainsAny(s.User+s.Domain+s.Root+s.URL+s.Password, "\r\n\x00") {
 		return errors.New("存储参数不正确")
 	}
 	if s.Kind == "webdav" {

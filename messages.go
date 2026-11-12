@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -59,7 +60,21 @@ func (a *app) listMessages(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, "读取消息失败")
 		return
 	}
-	reply(w, 200, map[string]any{"messages": out, "user": u, "device_template": a.config().DeviceTemplate, "max_file_mb": a.config().MaxMB})
+	config := a.config()
+	payload, e := json.Marshal(map[string]any{"messages": out, "user": u, "device_template": config.DeviceTemplate, "max_file_mb": config.MaxMB})
+	if e != nil {
+		fail(w, 500, "读取消息失败")
+		return
+	}
+	etag := fmt.Sprintf(`"%x"`, sha256.Sum256(payload))
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Vary", "Authorization")
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Write(payload)
 }
 func expiry(ttl int64) (int64, error) {
 	if ttl == 0 {

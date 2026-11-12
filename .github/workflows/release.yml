@@ -23,12 +23,6 @@ jobs:
           node-version: 24
       - run: go test -race -timeout 180s -v ./... && go vet ./... && node --check web/app.js
       - run: npm ci && npm test
-      - name: Real SMB integration
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y rclone samba
-          sudo systemctl stop smbd nmbd || true
-          bash tests/smb.sh
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
@@ -47,8 +41,21 @@ jobs:
           docker restart relay-test
           for n in $(seq 1 30); do curl -fsS http://127.0.0.1:28182/healthz && break || sleep 1; done
           curl -fsS http://127.0.0.1:28182/api/status | grep '"setup":true'
+  smb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Real SMB integration
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y rclone samba
+          sudo systemctl stop smbd nmbd || true
+          bash tests/smb.sh
   publish:
-    needs: test
+    needs: [test, smb]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +77,7 @@ jobs:
           sbom: true
           provenance: mode=max
   dockerhub:
-    needs: test
+    needs: [test, smb]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:

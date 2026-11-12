@@ -25,7 +25,7 @@ guest ok = no
 read only = no
 force user = $(id -un)
 EOF
-printf 'fixture-password\nfixture-password\n' | sudo smbpasswd --configfile="$fixture/smb.conf" -s -a "$(id -un)"
+printf 'fixture-password\nfixture-password\n' | sudo smbpasswd -c "$fixture/smb.conf" -s -a "$(id -un)"
 sudo smbd --configfile="$fixture/smb.conf" --daemon
 for n in $(seq 1 20); do if timeout 1 bash -c '</dev/tcp/127.0.0.1/445' 2>/dev/null; then break; fi; sleep 1; done
 export POCKET_SMB_TEST=1
