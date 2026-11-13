@@ -74,3 +74,9 @@ docker compose -f docker-compose.yml up -d
 - 本次 UI 不修改业务接口、数据库和附件布局。升级前备份完整 data，重建时继续使用同一挂载；不要删除数据卷。
 - 容器服务使用 UID/GID 10001；入口仅准备专用 data 目录。NAS ACL、只读目录或特殊挂载不能自动绕过，详见迁移说明。
 - [升级与迁移](docs/UI-UPGRADE.md) · [后续 Agent 复用手册](docs/AGENT-HANDBOOK.md)。手册登记发布所需的 Secret 名称与权限，绝不包含真实 Token。
+
+## 开源与部署说明
+
+本项目采用 [MIT License](LICENSE)，可自行部署与按许可证使用。源码和镜像不包含维护者的真实部署地址、个人邮箱、访问令牌、开发电脑路径或业务数据。项目名称、公开源码链接和第三方许可证署名保留。
+
+上面的最简 Compose 即可启动。只有首次账号初始化、端口与持久化是基础部署所需；Telegram、Webhook、MQTT 或远程存储等集成均按需配置，详见使用文档。升级时保留完整数据目录。

@@ -767,7 +767,7 @@ func (a *app) deliverTelegram(ctx context.Context, cfg telegramConfig, rev strin
 		a.db.Exec(`DELETE FROM telegram_outbox WHERE message_id=?`, id)
 		return true, errors.New("归属账户已过期，发送已停止")
 	}
-	parts := telegramChunks("来自 " + m.Device + "\n" + m.Text)
+	parts := telegramChunks(m.Text)
 	if m.FileID != "" && m.Size > 50<<20 {
 		parts = append(parts, "附件 "+m.Name+" 超过 Telegram 50 MB 上限，请在网站下载。")
 		m.FileID = ""

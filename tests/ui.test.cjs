@@ -853,7 +853,7 @@ test("drawer waits for paint before focusing and returns focus on close",async t
 
 test("search dialog closes on navigation, clear, logout and button without losing composer draft", async t => {
  const f=fixture(t);await settle();await login(f);
- assert.ok(f.w.document.querySelector(".inbox-intro-compact"));
+ assert.equal(f.w.document.querySelector(".inbox-intro-compact"), null);
  assert.equal(f.w.document.querySelector(".inbox-intro p"),null);
  await f.w.__test.setView("all");
  f.$("message-text").value="draft";
@@ -871,12 +871,13 @@ test("search dialog closes on navigation, clear, logout and button without losin
  assert.equal(f.$("search-dialog").open,false);
 });
 
-test("workspace appearance and language live only in sidebar; message actions stay transparent", async t => {
+test("workspace theme and language are compact topbar controls; message actions stay transparent", async t => {
  const f=fixture(t);await settle();
  assert.equal(f.w.document.querySelector(".topbar [data-appearance-open]"),null);
- assert.equal(f.w.document.querySelector(".topbar [data-lang-toggle]"),null);
- assert.ok(f.w.document.querySelector("#relay-nav [data-appearance-open]"));
- assert.ok(f.w.document.querySelector("#relay-nav [data-lang-toggle]"));
+ assert.ok(f.w.document.querySelector(".topbar [data-lang-toggle]"));
+ assert.ok(f.w.document.querySelector(".topbar [data-theme-choice='system']"));
+ assert.equal(f.w.document.querySelector("#relay-nav [data-appearance-open]"), null);
+ assert.equal(f.w.document.querySelector("#relay-nav [data-lang-toggle]"), null);
  const css=fs.readFileSync("web/design-system.css","utf8");
  assert.match(css,/\.message-actions a\{background:transparent/);
  assert.match(css,/\.composer textarea\{min-height:64px/);

@@ -61,8 +61,8 @@
 :root[data-app-id] pre,:root[data-app-id] code{background:var(--accent-soft);color:var(--text)}
 /* New appearance UI only; never reposition existing business containers. */
 .appearance-controls{display:flex;align-items:center;gap:6px;flex-shrink:0}
-:root[data-app-id] .theme-switch{display:flex;gap:2px;padding:3px;border:.5px solid var(--border);border-radius:999px;background:var(--surface)}
-:root[data-app-id] .theme-switch button{min-width:32px;min-height:30px;padding:4px 8px;line-height:1.4;border:0;border-radius:999px;background:transparent;color:var(--muted);box-shadow:none;font-size:13px}
+:root[data-app-id] .theme-switch{display:flex;gap:2px;padding:3px;border:.5px solid var(--border);border-radius:8px;background:var(--surface)}
+:root[data-app-id] .theme-switch button{min-width:32px;min-height:30px;padding:4px 8px;line-height:1.4;border:0;border-radius:8px;background:transparent;color:var(--muted);box-shadow:none;font-size:13px}
 :root[data-app-id] .theme-switch button.on,:root[data-app-id] .appearance-options button.on{background:var(--grad-accent);color:var(--on-accent)}
 :root[data-app-id] .appearance-controls>button{min-width:32px;min-height:32px;padding:4px 7px;border:0;border-radius:7px;background:transparent}
 :root[data-app-id=relay] .auth-panel{position:relative}
@@ -157,3 +157,19 @@
 :root[data-app-id=relay] .image-thumb{background:transparent}
 .session-loading{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;color:var(--muted);background:var(--bg)}
 .session-loading p{margin:0}
+
+/* Consistent surfaces and bounded focus indicators across the three applications. */
+:root[data-app-id] :is(button,.button,.button-link,input:not([type=checkbox]):not([type=radio]),select,textarea){border-radius:8px}
+:root[data-app-id] :is(.card,.panel,.settings-card,.filter-panel,.rule-card,.login-card,.login-form,.bubble,.message-image,.composer-inner,.attachment-tag,.modal,.modal-card,.about-dialog,.movie-stage,.card-poster,.movie-modal,.sample-card,.sample-note,.sidebar-note,.detail-box,.notice-channel,.file-card,.empty-reel,.user-menu,.search-box,.inbox-intro){border-radius:10px}
+:root[data-app-id] :is(.pill,.badge,.count,.version-mark,.expiry-badge,.tags span,.theme-switch){border-radius:8px}
+:root[data-app-id] .theme-switch button{border-radius:6px}
+:root[data-app-id] :is(.nav-item,.sidebar nav button,.movie-sidebar nav>a,.movie-sidebar nav>button,.notice-tabs button){border-radius:8px}
+:root[data-app-id] input[type=checkbox]{appearance:none;-webkit-appearance:none;display:inline-grid;place-items:center;vertical-align:middle;width:18px;min-width:18px;max-width:18px;height:18px;min-height:18px;max-height:18px;padding:0;margin:0;flex:0 0 18px;border:1px solid var(--muted);border-radius:4px;background:var(--surface-solid);box-shadow:none;outline:none;cursor:pointer}
+:root[data-app-id] input[type=checkbox]::before{content:"";width:4px;height:8px;border:solid var(--on-accent);border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg) scale(0)}
+:root[data-app-id] input[type=checkbox]:checked{background:var(--grad-accent);border-color:var(--grad-accent)}
+:root[data-app-id] input[type=checkbox]:checked::before{transform:translateY(-1px) rotate(45deg) scale(1)}
+:root[data-app-id] input[type=checkbox]:disabled{opacity:.5;cursor:not-allowed}
+:root[data-app-id] :is(button,a,input,select,textarea):focus:not(:focus-visible){outline:none;box-shadow:none}
+:root[data-app-id] :is(button,a,input,select,textarea):focus-visible{outline:2px solid var(--accent);outline-offset:3px;box-shadow:none}
+:root[data-app-id] input[type=radio]{width:18px;height:18px;min-height:18px;max-height:18px;padding:0;flex:0 0 18px;border-radius:50%}
+@media(forced-colors:active){:root[data-app-id] input[type=checkbox]{appearance:auto;-webkit-appearance:auto}:root[data-app-id] input[type=checkbox]::before{display:none}}

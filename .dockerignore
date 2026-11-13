@@ -4,3 +4,14 @@ data
 *.exe
 *.log
 node_modules
+
+.secrets
+runtime
+.local
+.env
+.env.*
+*.dpapi
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
