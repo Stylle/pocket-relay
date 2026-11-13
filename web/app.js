@@ -319,7 +319,7 @@ document
       (b.onclick = () =>
         setView(b.dataset.view).catch((e) => toast(e.message, true))),
   );
-$("mobile-menu").onclick = () => $("workspace").classList.toggle("menu-open");
+// Drawer, theme and About are handled by appearance.js; session state stays here.
 async function setView(view) {
   closeOriginal();
   state.generation++;
@@ -338,12 +338,12 @@ async function setView(view) {
       : "搜索默认覆盖全部文字记录。";
   state.view = view;
   $("search-form").hidden = view !== "all";
-  $("workspace").classList.remove("menu-open");
+  $("workspace").classList.remove("menu-open", "drawer-open");
   document
     .querySelectorAll("[data-view]")
     .forEach((b) => b.classList.toggle("active", b.dataset.view === view));
   $("view-title").textContent = {
-    messages: "本次消息 ✦",
+    messages: "本次消息",
     all: "全部信息",
     files: "文件与影像",
     settings: "设备设置",

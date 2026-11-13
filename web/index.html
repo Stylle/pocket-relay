@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-app-id="relay" data-app-name="随手传" data-app-version="0.5.0" data-app-copyright="© 2026 Stylle" data-app-description="用于多设备同步文字、图片与文件，支持私有存储、Telegram 和加密备份。" data-default-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta
@@ -14,7 +14,7 @@
     <script src="/session.js" defer></script>
     <script src="/message-text.js" defer></script>
     <script src="/app.js" defer></script>
-  </head>
+  <link rel="stylesheet" href="/design-system.css"><script src="/appearance.js"></script></head>
   <body>
     <div id="toast" role="status" aria-live="polite" hidden></div>
     <main id="auth" class="auth-layout">
@@ -42,7 +42,7 @@
         <footer>轻装上阵 · 私有存储 · 多设备同步</footer>
       </section>
       <section class="auth-panel">
-        <div class="auth-box">
+        <div class="auth-box"><div class="appearance-controls"><label><span>主题</span><select data-theme-select aria-label="界面主题"><option value="light">浅灰</option><option value="dark">暗黑</option><option value="green">墨绿</option><option value="system">跟随系统</option></select></label><button type="button" data-about-open>关于</button></div>
           <span class="pill">✦ 只属于你的信息空间</span>
           <h2 id="auth-title">欢迎回来</h2>
           <p id="auth-description" class="muted">
@@ -105,8 +105,8 @@
         </div>
       </section>
     </main>
-    <div id="workspace" class="workspace" hidden>
-      <aside class="sidebar">
+    <div id="workspace" class="workspace" data-drawer-host hidden>
+      <button class="drawer-backdrop" type="button" data-drawer-close aria-label="关闭导航"></button><aside id="relay-nav" class="sidebar" data-drawer aria-label="工作空间导航"><button class="drawer-close" type="button" data-drawer-close>关闭导航</button>
         <a class="brand" href="/"><span class="brand-icon">↗</span> 随手传</a
         ><span class="sidebar-label">我的空间</span>
         <nav>
@@ -129,7 +129,7 @@
             你的消息只在自己的账户中可见。<br />默认一直保存，直到你主动删除。
           </p>
         </div>
-        <div class="account-card">
+        <div class="sidebar-copyright">© 2026 Stylle · MIT License <button type="button" data-about-open>关于与许可</button></div><div class="account-card">
           <span class="avatar" id="account-avatar">我</span>
           <div>
             <strong id="account-name"></strong><small id="account-role"></small>
@@ -150,9 +150,9 @@
             <span class="eyebrow">A LITTLE LESS FRICTION</span>
             <h1 id="view-title">我的收件箱 <span>✦</span></h1>
           </div>
-          <div class="topbar-actions">
+          <div class="topbar-actions"><div class="appearance-controls"><label><span>主题</span><select data-theme-select aria-label="界面主题"><option value="light">浅灰</option><option value="dark">暗黑</option><option value="green">墨绿</option><option value="system">跟随系统</option></select></label><button type="button" data-about-open>关于</button></div>
             <span id="sync-state" class="sync-state"><i></i>已连接</span
-            ><button id="mobile-menu" class="icon-button" aria-label="展开导航">
+            ><button id="mobile-menu" class="icon-button drawer-toggle" data-drawer-toggle aria-controls="relay-nav" aria-expanded="false" aria-label="展开导航">
               ☰
             </button>
           </div>
@@ -227,7 +227,7 @@
               浏览器不能读取电脑系统用户名。名称保存在当前浏览器；服务器只显示脱敏
               IP，不信任客户端伪造的来源地址。
             </p>
-            <button class="primary">保存设备名称</button>
+            <div class="form-actions-sticky"><button class="primary">保存设备名称</button></div>
           </form>
           <div class="settings-card">
             <h3>关于隐私与复制</h3>
@@ -334,7 +334,7 @@
             <p class="muted small">
               保存到后台，所有设备沿用；不影响复制的原文。
             </p>
-            <button class="primary">保存设置</button>
+            <div class="form-actions-sticky"><button class="primary">保存设置</button></div>
           </form>
           <form id="telegram-form" class="settings-card">
             <h3>Telegram 机器人</h3>
