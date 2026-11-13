@@ -67,7 +67,7 @@
   }
   if (about.open) return;
   if (typeof about.showModal === "function") about.showModal();
-  else { about.setAttribute("open",""); about.querySelector("button").focus(); }
+  else window.location.assign("/about.html");
  }
  let drawerHost, returnFocus;
  function closeDrawer() {
