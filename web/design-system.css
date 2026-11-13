@@ -1,494 +1,109 @@
-/* UI follows Stylle/wusaqi-gallery-go f9bc867. Product behavior remains independent. */
-/* ============ 主题变量（亮/暗三态，配色参考 maxcat 风格） ============ */
-:root[data-app-id] {
-  --grad-accent: linear-gradient(90deg, #ffb7c5, #e8668a, #5c9ced);
-  --grad-bg: linear-gradient(135deg, #fff9fb, #f3f8fb 48%, #f8f6f9);
-  --bg: #fff9fb;
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-solid: #ffffff;
-  --surface-hover: rgba(255, 255, 255, 0.95);
-  --border: rgba(26, 24, 34, 0.1);
-  --text: #1a1822;
-  --muted: #6f6d7b;
-  --accent: #e8668a;
-  --accent-2: #5c9ced;
-  --on-accent: #1a1822;
-  --mint: #00bf99;
-  --accent-soft: rgba(232, 102, 138, 0.1);
-  --mint-soft: rgba(0, 191, 153, 0.12);
-  --ok: #0d9488;
-  --err: #f85149;
-  --shadow: 0 8px 30px rgba(26, 24, 34, 0.08);
-  --radius: 10px;
-  color-scheme: light;
-}
-:root[data-app-id][data-theme='dark'] {
-  --grad-bg: linear-gradient(135deg, #1a1822, #261d2e 48%, #182631);
-  --bg: #0d1117;
-  --surface: rgba(255, 255, 255, 0.05);
-  --surface-solid: #1a1822;
-  --surface-hover: rgba(255, 255, 255, 0.09);
-  --border: rgba(255, 255, 255, 0.12);
-  --text: #f0eef5;
-  --muted: #9a98a8;
-  --accent: #ff8aa6;
-  --accent-2: #7cb3ff;
-  --mint: #39d2c0;
-  --accent-soft: rgba(255, 138, 166, 0.14);
-  --mint-soft: rgba(57, 210, 192, 0.14);
-  --ok: #39d2c0;
-  --err: #f85149;
-  --shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-  color-scheme: dark;
-}
-
-/* ============ 配色风格：纯色（素净单色，默认） ============ */
-/* 与站点 logo 的靛紫同族；主按钮使用满足文字对比度的深紫色。 */
-:root[data-app-id][data-style='solid'] {
-  --on-accent: #fff;
-  --grad-accent: linear-gradient(90deg, #5b57c7, #5b57c7);
-  --grad-bg: linear-gradient(135deg, #fbfbfe, #f4f5fa 48%, #f7f8fc);
-  --bg: #fbfbfe;
-  --accent: #5b57c7;
-  --accent-2: #4a6fd4;
-  --accent-soft: rgba(91, 87, 199, 0.1);
-}
-:root[data-app-id]:root[data-app-id][data-theme='dark'][data-style='solid'] {
-  --grad-accent: linear-gradient(90deg, #6863cc, #6863cc);
-  --grad-bg: linear-gradient(135deg, #14161f, #1a1b26 48%, #161c26);
-  --bg: #0d1017;
-  --accent: #8c88ef;
-  --accent-2: #86a8ff;
-  --accent-soft: rgba(140, 136, 239, 0.16);
-}
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
-body {
-  font-family: -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
-  background: var(--grad-bg) fixed;
-  color: var(--text);
-  font-size: 14px;
-  line-height: 1.65;
-  min-height: 100vh;
-  transition: background 0.3s, color 0.3s;
-}
-#app { display: flex; flex-direction: column; min-height: 100vh; }
-main.wrap { flex: 1; }
-
-a { color: var(--accent-2); text-decoration: none; }
-button {
-  font: inherit;
-  white-space: nowrap;
-  line-height: 1.4;
-  background: var(--grad-accent);
-  color: var(--on-accent);
-  border: none;
-  border-radius: 7px;
-  padding: 9px 22px;
-  cursor: pointer;
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.16), 0 1px 2px rgba(26, 24, 34, 0.12);
-  transition: transform 0.15s, filter 0.15s, box-shadow 0.15s;
-}
-button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow); filter: brightness(1.05); }
-button:active:not(:disabled) { transform: translateY(0); }
-button:disabled { opacity: 0.45; cursor: not-allowed; }
-button.ghost {
-  background: var(--surface);
-  color: var(--text);
-  border: 0.5px solid var(--border);
-  backdrop-filter: blur(8px);
-}
-input, select {
-  font: inherit;
-  border: 0.5px solid var(--border);
-  border-radius: 7px;
-  padding: 8px 12px;
-  background: var(--surface-solid);
-  color: var(--text);
-  transition: border-color 0.15s;
-}
-input:focus, select:focus { outline: none; border-color: var(--accent); }
-button:focus-visible, a:focus-visible, [role='button']:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
-textarea { font: inherit; color: var(--text); background: var(--surface-solid); border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; max-width: 100%; resize: vertical; }
-textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.link-button { display: inline-flex; align-items: center; min-height: 40px; padding: 8px 18px; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--surface); }
-.mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
-.muted { color: var(--muted); }
-.grad-text {
-  background: var(--grad-accent);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* ============ 顶栏 ============ */
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 13px 28px;
-  border-bottom: 0.5px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--surface);
-  backdrop-filter: blur(14px);
-}
-.topbar .logo {
-  font-weight: 500;
-  font-size: 17px;
-  color: var(--accent);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.topbar .logo .logo-img {
-  width: 24px;
-  height: 24px;
-  border-radius: 5px;
-  flex: none;
-}
-.topbar .logo span { background: inherit; -webkit-background-clip: text; background-clip: text; }
-.topbar nav { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
-.topbar nav a {
-  padding: 5px 13px;
-  border-radius: 999px;
-  color: var(--muted);
-  transition: all 0.15s;
-}
-.topbar nav a:hover { color: var(--text); background: var(--surface-hover); }
-.topbar nav a.active {
-  color: var(--on-accent);
-  background: var(--grad-accent);
-}
-.topbar nav a.locked { opacity: 0.55; }
-.theme-switch {
-  display: flex;
-  gap: 2px;
-  background: var(--surface);
-  border: 0.5px solid var(--border);
-  border-radius: 999px;
-  padding: 3px;
-}
-.theme-switch button {
-  background: none;
-  color: var(--muted);
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 13px;
-  box-shadow: none;
-}
-.theme-switch button:hover { transform: none; box-shadow: none; }
-.theme-switch button.on { background: var(--grad-accent); color: var(--on-accent); }
-.auth-badge {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 12.5px; color: var(--muted);
-  padding: 4px 10px; border-radius: 999px;
-  border: 0.5px solid var(--border);
-}
-.dot { width: 8px; height: 8px; border-radius: 50%; }
-.dot.on { background: var(--mint); box-shadow: 0 0 6px var(--mint); }
-.dot.off { background: var(--err); }
-
-/* ============ 布局 ============ */
-.wrap { max-width: 1150px; margin: 0 auto; padding: 26px 28px 60px; width: 100%; }
-.site-footer {
-  text-align: center;
-  padding: 22px;
-  color: var(--muted);
-  font-size: 12.5px;
-  border-top: 0.5px solid var(--border);
-}
-.tags { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 18px; }
-.tag {
-  font-size: 12px;
-  padding: 3px 12px;
-  border-radius: 999px;
-  border: 0.5px solid var(--border);
-  background: var(--mint-soft);
-  color: var(--mint);
-}
-
-
-/* Bridge existing component tokens to the reference's theme contract. */
+/* Visual-only theme layer. Business layout belongs to each project's original stylesheet. */
 :root[data-app-id]{
- --bg-deep:var(--surface-hover);--surface-muted:var(--surface);--border-strong:var(--border);
- --accent-strong:var(--accent);--accent-wash:var(--accent-soft);--danger:var(--err);--warning:#b7791f;
+ --bg:#f6f7fb;--grad-bg:var(--bg);--surface:rgba(255,255,255,.75);--surface-solid:#fff;--surface-hover:#f1f2f8;
+ --border:rgba(26,24,34,.12);--text:#1a1822;--muted:#6f6d7b;--accent:#5b57c7;--accent-2:#4a6fd4;--on-accent:#fff;
+ --grad-accent:#5b57c7;--accent-soft:rgba(91,87,199,.10);--mint:#00a88b;--mint-soft:rgba(0,168,139,.1);--ok:#0d9488;--err:#d84343;
+ --shadow:0 8px 30px rgba(26,24,34,.08);--radius:10px;color-scheme:light
+}
+:root[data-app-id][data-theme='dark']{
+ --bg:#11141c;--surface:rgba(255,255,255,.05);--surface-solid:#1c202b;--surface-hover:#272c39;
+ --border:rgba(255,255,255,.12);--text:#f0eef5;--muted:#a8a8b7;--accent:#a29ef4;--accent-2:#94b5f8;--grad-accent:#6863cc;
+ --accent-soft:rgba(140,136,239,.16);--mint:#39d2c0;--mint-soft:rgba(57,210,192,.14);--ok:#39d2c0;--err:#ff8585;
+ --shadow:0 8px 30px rgba(0,0,0,.3);color-scheme:dark
+}
+/* Paint layer only. Original layout styles remain authoritative. */
+:root[data-app-id]{
+ --bg-deep:var(--surface-hover);--surface-muted:var(--surface);--border-strong:var(--border);--accent-strong:var(--accent);--accent-wash:var(--accent-soft);
  --paper:var(--bg);--white:var(--surface-solid);--ink:var(--text);--green:var(--accent);--green-soft:var(--accent-soft);--line:var(--border);--sand:var(--surface);
- --theme-bg:var(--bg);--theme-bg-secondary:var(--surface-solid);--theme-surface-muted:var(--surface);
- --theme-text:var(--text);--theme-text-secondary:var(--muted);--theme-primary:var(--accent);--theme-primary-hover:var(--accent);--theme-primary-active:var(--accent);
- --theme-primary-soft:var(--accent-soft);--theme-on-primary:var(--on-accent);--theme-border:var(--border);--theme-border-strong:var(--accent);--theme-shadow:var(--shadow);--theme-overlay:rgba(13,17,23,.65);--theme-danger:var(--err);--theme-success:var(--ok);
- font-family:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;font-size:14px;color:var(--text);background:var(--bg);
+ --danger:var(--err);--warning:#b7791f;
+ --theme-bg:var(--bg);--theme-bg-secondary:var(--surface-solid);--theme-text:var(--text);--theme-text-secondary:var(--muted);--theme-primary:var(--accent);--theme-primary-soft:var(--accent-soft);--theme-border:var(--border);--theme-shadow:var(--shadow);
+ font-family:-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;color:var(--text);background:var(--bg)
 }
-:root[data-app-id] body{min-width:320px;background:var(--grad-bg) fixed;color:var(--text);font-size:14px;line-height:1.65}
-:root[data-app-id] button{min-height:40px;min-width:40px;box-sizing:border-box}
-:root[data-app-id] button:not(.primary):not(.on),:root[data-app-id] .button:not(.primary){background:var(--surface);color:var(--text);border:.5px solid var(--border);box-shadow:none}
-:root[data-app-id] button.primary,:root[data-app-id] .button.primary,:root[data-app-id] .button-link.primary{background:var(--grad-accent);color:var(--on-accent);border:0;border-radius:7px;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.16),0 1px 2px rgba(26,24,34,.12)}
-:root[data-app-id] button:disabled{opacity:.45;cursor:not-allowed}
-:root[data-app-id] input,:root[data-app-id] select,:root[data-app-id] textarea{background:var(--surface-solid);color:var(--text);border:.5px solid var(--border);border-radius:7px;max-width:100%;min-width:0;min-height:40px;font:inherit;padding:8px 12px}
-:root[data-app-id] input[type=checkbox],:root[data-app-id] input[type=radio]{min-height:0;width:16px;height:16px;accent-color:var(--accent)}
-:root[data-app-id] input:focus,:root[data-app-id] select:focus,:root[data-app-id] textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent);box-shadow:none}
-:root[data-app-id] h1{font-size:23px;font-weight:600;line-height:1.4;letter-spacing:0}
-:root[data-app-id] h2{font-size:18px;font-weight:500;letter-spacing:0}
-:root[data-app-id] h3{font-size:15px;font-weight:500}
-:root[data-app-id] small,:root[data-app-id] .muted{font-size:12px;color:var(--muted)}
-:root[data-app-id] .eyebrow,:root[data-app-id] .story-cards,:root[data-app-id] .story-grid,:root[data-app-id] .sidebar-note,:root[data-app-id] .inbox-intro{display:none}
-:root[data-app-id] .topbar{padding:12px 28px;gap:18px;min-height:64px;height:auto;background:var(--surface);border-bottom:.5px solid var(--border);backdrop-filter:blur(14px);box-shadow:none}
-:root[data-app-id] .brand{font-size:17px;font-weight:500;letter-spacing:0;color:var(--accent);gap:8px;flex-shrink:0;text-decoration:none}
-:root[data-app-id] .brand img{width:24px;height:24px;filter:none;border-radius:5px}
-:root[data-app-id] .brand-copy small{display:none}
-:root[data-app-id] .topbar nav a{border-radius:999px;padding:7px 13px;min-height:36px;color:var(--muted)}
-:root[data-app-id] .topbar nav a.active{background:var(--grad-accent);color:var(--on-accent)}
-:root[data-app-id] .topbar nav a::after{display:none}
-:root[data-app-id] .card,:root[data-app-id] .panel,:root[data-app-id] .settings-card,:root[data-app-id] .filter-panel,:root[data-app-id] .rule-card{border:.5px solid var(--border);border-radius:10px;background:var(--surface);padding:20px 22px;box-shadow:none;backdrop-filter:blur(8px)}
-:root[data-app-id] .panel,:root[data-app-id] .settings-card{margin:0 0 20px}
-:root[data-app-id] .field-grid,:root[data-app-id] .form-grid,:root[data-app-id] .grid2{gap:16px}
-:root[data-app-id] .field,:root[data-app-id] label{font-size:13px}
-:root[data-app-id] .action-row,:root[data-app-id] .button-row,:root[data-app-id] .row,:root[data-app-id] .hero-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
-:root[data-app-id] .action-row,:root[data-app-id] .button-row{margin-top:18px}
-:root[data-app-id] .check-row,:root[data-app-id] .check{min-height:40px;align-items:center;gap:8px}
-:root[data-app-id] .status-dot,:root[data-app-id] .badge,:root[data-app-id] .tags span{border:.5px solid var(--border);border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:12px;padding:3px 10px;box-shadow:none}
-:root[data-app-id] .status-dot::before{box-shadow:none}
-:root[data-app-id] .error,:root[data-app-id] .inline-error,:root[data-app-id] .danger-text{color:var(--err)}
-:root[data-app-id] table{font-size:13px;width:100%;border-collapse:collapse}
-:root[data-app-id] th,:root[data-app-id] td{border-color:var(--border);padding:11px 12px;overflow-wrap:anywhere}
-:root[data-app-id] th{color:var(--muted);background:var(--surface)}
-:root[data-app-id] .table-wrap{max-width:100%;overflow-x:auto}
-:root[data-app-id] code,:root[data-app-id] pre{background:var(--accent-soft);color:var(--text);border-radius:6px;overflow-wrap:anywhere}
-:root[data-app-id] .toast,:root[data-app-id] #toast{border-radius:10px;background:var(--surface-solid);border:.5px solid var(--border);color:var(--text);box-shadow:var(--shadow)}
-:root[data-app-id] .site-footer{font-size:12px;color:var(--muted);padding:20px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;border-top:.5px solid var(--border);margin-top:auto}
-:root[data-app-id] .site-footer button{font-size:12px;padding:5px 10px}
+:root[data-app-id] body{background:var(--grad-bg) fixed;color:var(--text)}
+:root[data-app-id] a{color:var(--accent-2)}
+:root[data-app-id] .topbar,:root[data-app-id] .sidebar,:root[data-app-id] .card,:root[data-app-id] .panel,
+:root[data-app-id] .settings-card,:root[data-app-id] .filter-panel,:root[data-app-id] .rule-card,
+:root[data-app-id] .login-form,:root[data-app-id] .auth-panel,:root[data-app-id] .composer,
+:root[data-app-id] .composer-box,:root[data-app-id] .bubble,:root[data-app-id] .search-bar,
+:root[data-app-id] .user-menu,:root[data-app-id] .modal,:root[data-app-id] .modal-card,
+:root[data-app-id] .stats article,:root[data-app-id] .file-card,:root[data-app-id] .sample-card{
+ background:var(--surface-solid);color:var(--text);border-color:var(--border)
+}
+:root[data-app-id] .card,:root[data-app-id] .panel,:root[data-app-id] .settings-card,:root[data-app-id] .rule-card{border-radius:10px}
+:root[data-app-id] .login-story,:root[data-app-id] .auth-story{background:var(--accent-soft);color:var(--text)}
+:root[data-app-id] .sample-note,:root[data-app-id] .sidebar-note,:root[data-app-id] .inbox-intro{background:var(--accent-soft);color:var(--text);border-color:var(--border)}
+:root[data-app-id] .sample-card,:root[data-app-id] .sample-note{box-shadow:var(--shadow)}
+:root[data-app-id] .brand,:root[data-app-id] .brand-copy,:root[data-app-id] h1,:root[data-app-id] h2,:root[data-app-id] h3{color:var(--text)}
+:root[data-app-id] .muted,:root[data-app-id] small,:root[data-app-id] .auth-foot,
+:root[data-app-id] .story-body>p,:root[data-app-id] .login-story p,:root[data-app-id] .section-heading p,
+:root[data-app-id] .settings-card>p,:root[data-app-id] .empty,:root[data-app-id] .empty p,
+:root[data-app-id] .message-meta,:root[data-app-id] .composer-foot,:root[data-app-id] .space-label,:root[data-app-id] .top-status{color:var(--muted)}
+:root[data-app-id] input,:root[data-app-id] select,:root[data-app-id] textarea{background:var(--surface-solid);color:var(--text);border-color:var(--border);border-radius:7px}
+:root[data-app-id] input::placeholder,:root[data-app-id] textarea::placeholder{color:var(--muted);opacity:1}
+:root[data-app-id] input:focus,:root[data-app-id] select:focus,:root[data-app-id] textarea:focus{outline-color:var(--accent);border-color:var(--accent);box-shadow:none}
+:root[data-app-id] input[type=checkbox],:root[data-app-id] input[type=radio]{accent-color:var(--accent)}
+:root[data-app-id] button,:root[data-app-id] .button,:root[data-app-id] .secondary{color:var(--text);background:var(--surface);border-color:var(--border)}
+:root[data-app-id] button.primary,:root[data-app-id] .button.primary,:root[data-app-id] .button-link.primary{background:var(--grad-accent);color:var(--on-accent);border-color:var(--accent)}
+:root[data-app-id] button:hover:not(:disabled),:root[data-app-id] .button:hover{border-color:var(--accent)}
+:root[data-app-id] button.primary:hover:not(:disabled),:root[data-app-id] .button.primary:hover{filter:brightness(1.05)}
+:root[data-app-id] .nav-item,:root[data-app-id] .sidebar nav button,:root[data-app-id] .admin-nav>button,
+:root[data-app-id] .icon-btn,:root[data-app-id] .icon-button,:root[data-app-id] .link{background:transparent;color:var(--muted)}
+:root[data-app-id] .nav-item.active,:root[data-app-id] .sidebar nav button.active,:root[data-app-id] .admin-nav>button.active{background:var(--accent-soft);color:var(--accent)}
+:root[data-app-id] .sidebar nav button span{color:inherit}
+:root[data-app-id] .topbar nav a.active{color:var(--accent)}
+:root[data-app-id] .topbar nav a::after{background:var(--accent)}
+:root[data-app-id] .avatar,:root[data-app-id] .brand-icon,:root[data-app-id] .message-avatar,:root[data-app-id] .user-chip>span{background:var(--grad-accent);color:var(--on-accent)}
+:root[data-app-id] .badge,:root[data-app-id] .count,:root[data-app-id] .pill,:root[data-app-id] .tags span,:root[data-app-id] .version-mark,:root[data-app-id] .empty-icon,:root[data-app-id] .empty>span{background:var(--accent-soft);color:var(--accent);border-color:var(--border)}
+:root[data-app-id] th,:root[data-app-id] td,:root[data-app-id] .release,:root[data-app-id] .sidebar-footer,:root[data-app-id] .auth-foot,:root[data-app-id] .account-card{border-color:var(--border)}
+:root[data-app-id] th{background:var(--surface);color:var(--muted)}
+:root[data-app-id] .error,:root[data-app-id] .danger-text,:root[data-app-id] .inline-error{color:var(--err)}
+:root[data-app-id] #toast,:root[data-app-id] .toast{background:var(--surface-solid);color:var(--text);border-color:var(--border);box-shadow:var(--shadow)}
+:root[data-app-id] pre,:root[data-app-id] code{background:var(--accent-soft);color:var(--text)}
+/* New appearance UI only; never reposition existing business containers. */
 .appearance-controls{display:flex;align-items:center;gap:6px;flex-shrink:0}
-:root[data-app-id] .theme-switch{display:flex;border-radius:999px;gap:2px;padding:3px;border:.5px solid var(--border);background:var(--surface)}
-:root[data-app-id] .theme-switch button{min-height:30px;min-width:32px;padding:4px 9px;border:0;border-radius:999px;background:none;color:var(--muted);box-shadow:none;font-size:13px;line-height:1.4}
-:root[data-app-id] .theme-switch button.on{background:var(--grad-accent);color:var(--on-accent)}
-:root[data-app-id] .appearance-controls>button{min-width:34px;min-height:34px;padding:5px 8px;background:transparent;border:0;font-size:16px}
-.appearance-panel,.about-dialog{width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow-y:auto;border:.5px solid var(--border);border-radius:13px;padding:26px;background:var(--surface-solid);color:var(--text);box-shadow:var(--shadow)}
-.appearance-panel::backdrop,.about-dialog::backdrop{background:rgba(13,17,23,.65);backdrop-filter:blur(6px)}
-.appearance-panel h2,.about-dialog h2{margin:0 0 16px}
-.appearance-panel section{margin:20px 0}
-.appearance-panel .theme-switch{border-radius:9px;justify-content:stretch}
-.appearance-panel .theme-switch button{flex:1;padding:9px;min-height:40px;border-radius:7px}
-.about-meta{display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px;margin:20px 0}
-.about-meta dt{color:var(--muted)}.about-meta dd{margin:0;overflow-wrap:anywhere}
-.about-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
-.about-page{max-width:900px;padding:32px 24px;margin:0 auto}
-.about-page header{display:flex;gap:16px;align-items:center;margin-bottom:24px}
-.about-page .card{margin-bottom:20px}
-.drawer-toggle,.drawer-close,.drawer-backdrop{display:none}
-:root[data-app-id] .sidebar,:root[data-app-id] .admin-nav{background:var(--surface);border:.5px solid var(--border);border-radius:10px;padding:14px 12px;box-shadow:none}
-:root[data-app-id] .sidebar nav button,:root[data-app-id] .admin-nav>button{background:none;border:0;color:var(--text);border-radius:8px;padding:11px 14px;margin:3px 0;text-align:left;font-size:14px;box-shadow:none;width:100%}
-:root[data-app-id] .sidebar nav button.active,:root[data-app-id] .admin-nav>button.active{background:var(--grad-accent);color:var(--on-accent)}
-:root[data-app-id] .sidebar nav button:hover,:root[data-app-id] .admin-nav>button:hover{transform:none}
-:root[data-app-id] .avatar,:root[data-app-id] .message-avatar,:root[data-app-id] .user-chip>span{background:var(--grad-accent);color:var(--on-accent);border-radius:50%}
-:root[data-app-id] .user-chip{border-radius:999px;border:.5px solid var(--border);background:var(--surface);padding:5px 10px 5px 5px}
-:root[data-app-id] .user-menu{background:var(--surface-solid);border:.5px solid var(--border);border-radius:10px;box-shadow:var(--shadow)}
-:root[data-app-id=movie] .page-wrap{width:100%;max-width:1250px;padding:30px 28px 50px;margin:0 auto}
-:root[data-app-id=movie] .admin-layout{display:grid;grid-template-columns:212px minmax(0,1fr);gap:26px;align-items:start}
-:root[data-app-id=movie] .admin-nav{top:90px;position:sticky}
-:root[data-app-id=movie] .admin-nav-title{padding:4px 14px 12px;border-bottom:.5px solid var(--border);margin-bottom:10px}
-:root[data-app-id=movie] .admin-nav-title h2{font-size:15px;margin:0}
-:root[data-app-id=movie] .admin-section-picker{display:none}
-:root[data-app-id=movie] .intro-row{margin-bottom:24px}
-:root[data-app-id=movie] .intro-row h1{font-size:25px}
-:root[data-app-id=movie] .catalog-stat strong{font-size:25px;color:var(--accent)}
-:root[data-app-id=movie] .catalog-stat{border-color:var(--border)}
-:root[data-app-id=movie] .movie-stage{border:.5px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);min-height:460px}
-:root[data-app-id=movie] .movie-copy{padding:32px}
-:root[data-app-id=movie] .movie-copy h2{font-size:27px;font-weight:600}
-:root[data-app-id=movie] .poster-wrap::after{display:none}
-:root[data-app-id=movie] .card-poster{border-radius:10px;border:.5px solid var(--border);box-shadow:none;aspect-ratio:2/3}
-:root[data-app-id=movie] .movie-card{background:none;border:0;padding:0;text-align:left;min-width:0;color:var(--text);box-shadow:none}
-:root[data-app-id=movie] .movie-card:hover{background:none}
-:root[data-app-id=movie] .overview{white-space:pre-line;overflow-wrap:anywhere;max-height:none;overflow:visible;line-height:1.85;font-size:14px;display:block;-webkit-line-clamp:unset}
-:root[data-app-id=movie] .movie-modal{border-radius:13px;background:var(--surface-solid);border:.5px solid var(--border)}
-:root[data-app-id=movie] .library-chips button{border-radius:999px;padding:6px 12px;min-height:36px}
-:root[data-app-id=movie] .library-chips button.on{background:var(--grad-accent);color:var(--on-accent)}
-:root[data-app-id=movie] .login-card{max-width:380px;padding:26px;background:var(--surface);border:.5px solid var(--border);border-radius:13px;box-shadow:var(--shadow)}
-:root[data-app-id=relay] .workspace{display:grid;grid-template-columns:212px minmax(0,1fr);gap:26px;max-width:1250px;padding:94px 28px 24px;margin:0 auto;min-height:100dvh;align-items:start}
-:root[data-app-id=relay] .sidebar{position:sticky;inset:auto;top:88px;width:212px;min-height:0;height:auto;max-height:calc(100dvh - 112px);overflow:auto}
-:root[data-app-id=relay] .sidebar>.brand,:root[data-app-id=relay] .sidebar-label{display:none}
-:root[data-app-id=relay] .main-panel{margin:0;min-height:calc(100dvh - 120px);display:flex;flex-direction:column;min-width:0}
-:root[data-app-id=relay] .topbar{position:fixed;inset:0 0 auto;z-index:40;padding:12px 28px;display:flex;justify-content:space-between}
-:root[data-app-id=relay] .topbar h1{font-size:17px;font-weight:500;margin:0;color:var(--accent)}
-:root[data-app-id=relay] .topbar h1>span{display:none}
-:root[data-app-id=relay] .topbar-actions{display:flex;gap:12px;align-items:center}
-:root[data-app-id=relay] .messages-view{padding:0 0 20px;max-width:none}
-:root[data-app-id=relay] .message-text{font-size:var(--message-font);color:var(--text);line-height:1.7}
-:root[data-app-id=relay] .message-link{color:var(--accent-2)}
-:root[data-app-id=relay] .bubble{border:.5px solid var(--border);border-radius:4px 12px 12px;padding:12px 16px;background:var(--surface);box-shadow:none}
-:root[data-app-id=relay] .message-actions button{font-size:12px;border:0;background:none;padding:5px 9px;color:var(--muted);min-height:36px}
-:root[data-app-id=relay] .message-meta strong,:root[data-app-id=relay] .message-meta time{color:var(--muted);font-size:12px}
-:root[data-app-id=relay] .timeline{gap:18px}
-:root[data-app-id=relay] .composer{padding:10px 0 0;background:var(--grad-bg);width:100%;margin-top:auto;max-width:none}
-:root[data-app-id=relay] .composer-inner{border-radius:12px;background:var(--surface-solid);border:.5px solid var(--border);box-shadow:var(--shadow)}
-:root[data-app-id=relay] .composer textarea{border:0;background:none;min-height:44px;max-height:112px;padding:12px 16px 6px}
-:root[data-app-id=relay] .composer-toolbar{padding:4px 10px 10px;gap:10px;flex-wrap:wrap}
-:root[data-app-id=relay] .composer-tools{gap:6px;flex-wrap:wrap}
-:root[data-app-id=relay] .retention{margin:0;padding:0;border:0}
-:root[data-app-id=relay] .retention select{width:auto;max-width:150px;border:0;background:none;font-size:12px}
-:root[data-app-id=relay] .privacy-option{font-size:12px;padding:6px;min-height:36px}
-:root[data-app-id=relay] .settings-view{padding:0;max-width:none}
-:root[data-app-id=relay] .image-placeholder{background:var(--surface);border-color:var(--border);border-radius:8px}
-:root[data-app-id=relay] .image-viewer{background:rgba(13,17,23,.88)}
-:root[data-app-id=relay] .auth-layout{display:block;min-height:100dvh;padding:34px 20px;background:var(--grad-bg)}
-:root[data-app-id=relay] .auth-story{padding:0;margin:0 auto 28px;background:none;max-width:1100px}
-:root[data-app-id=relay] .story-body,:root[data-app-id=relay] .auth-story footer{display:none}
-:root[data-app-id=relay] .auth-panel{display:block;padding:20px 0;background:none}
-:root[data-app-id=relay] .auth-box{max-width:380px;padding:26px;border-radius:13px;background:var(--surface);border:.5px solid var(--border);box-shadow:var(--shadow);margin:0 auto}
-:root[data-app-id=relay] .auth-box .pill{display:none}
-:root[data-app-id=relay] .auth-box h2{font-size:21px;margin-top:20px}
-:root[data-app-id=relay] .auth-foot{font-size:12px;color:var(--muted);border-color:var(--border)}
-:root[data-app-id=relay] .sidebar-copyright{font-size:12px;color:var(--muted);padding:20px 0 12px;line-height:1.8}
-:root[data-app-id=relay] .account-card{padding-top:14px;border-color:var(--border)}
-:root[data-app-id=hub] .shell{display:grid;grid-template-columns:212px minmax(0,1fr);gap:26px;max-width:1250px;margin:0 auto;padding:94px 28px 24px;align-items:start;min-height:100dvh}
-:root[data-app-id=hub] .sidebar{position:sticky;inset:auto;top:88px;width:212px;height:auto;max-height:calc(100dvh - 112px);overflow:auto}
-:root[data-app-id=hub] .sidebar>.brand{display:none}
-:root[data-app-id=hub] .workspace{margin:0;min-width:0;min-height:calc(100dvh - 120px)}
-:root[data-app-id=hub] .topbar{position:fixed;inset:0 0 auto;z-index:40;display:flex;padding:12px 28px;min-height:64px}
-:root[data-app-id=hub] .topbar .muted{flex:1;text-align:center}
-:root[data-app-id=hub] .content{padding:0;max-width:none}
-:root[data-app-id=hub] .page-heading{margin:0 0 24px}
-:root[data-app-id=hub] .stats{gap:12px;margin-bottom:22px}
-:root[data-app-id=hub] .stats article{padding:16px;border:.5px solid var(--border);border-radius:10px;background:var(--surface);box-shadow:none}
-:root[data-app-id=hub] .stats article::after{display:none}
-:root[data-app-id=hub] .stats article>strong{font-size:25px;color:var(--accent)}
-:root[data-app-id=hub] .stats article>span,:root[data-app-id=hub] .stats article>small{font-size:12px;color:var(--muted)}
-:root[data-app-id=hub] .release{border-color:var(--border)}
-:root[data-app-id=hub] .release-summary{display:grid;grid-template-columns:minmax(90px,1fr) minmax(0,2fr) minmax(140px,1.4fr) minmax(90px,1fr);gap:16px;margin-bottom:10px}
-:root[data-app-id=hub] .release-summary>div{display:flex;flex-direction:column;gap:6px;min-width:0}
-:root[data-app-id=hub] .release-summary h3{margin:0;font-size:16px}
-:root[data-app-id=hub] .release-summary .badge{align-self:start}
-:root[data-app-id=hub] .release-details summary{display:flex;align-items:center;min-height:40px;color:var(--accent-2);cursor:pointer}
-:root[data-app-id=hub] .release-toolbar{display:flex;gap:14px;align-items:end;margin:18px 0;flex-wrap:wrap}
-:root[data-app-id=hub] .release-toolbar label{flex:1;min-width:160px;margin:0}
-:root[data-app-id=hub] .release-toolbar p{margin:0}
-:root[data-app-id=hub] .release-notes,:root[data-app-id=hub] .release-notes blockquote{color:var(--text)}
-:root[data-app-id=hub] .release-notes a{color:var(--accent-2)}
-:root[data-app-id=hub] .editor-preview,:root[data-app-id=hub] .release-notes pre{background:var(--surface)}
-:root[data-app-id=hub] .login-page{display:block;min-height:100dvh;padding:32px 20px}
-:root[data-app-id=hub] .login-story{min-height:0;background:none;padding:0;margin:0 auto 30px;max-width:1100px;color:var(--accent)}
-:root[data-app-id=hub] .login-story>div,:root[data-app-id=hub] .login-story>small{display:none}
-:root[data-app-id=hub] .login-form{display:block;max-width:380px;margin:40px auto;padding:26px;border:.5px solid var(--border);border-radius:13px;background:var(--surface);box-shadow:var(--shadow)}
-:root[data-app-id=hub] .login-form h2{font-size:21px;margin-top:22px}
-:root[data-app-id=hub] .public-page{max-width:1100px;padding:30px 24px;margin:auto}
-@media(max-width:1024px){:root[data-app-id] .topbar{gap:10px;padding-inline:20px}:root[data-app-id=hub] .topbar .muted{display:none}}
-@media(max-width:768px){
- :root[data-app-id] button{min-height:42px}
- :root[data-app-id] input,:root[data-app-id] select,:root[data-app-id] textarea{font-size:16px;min-height:42px}
- :root[data-app-id] .topbar{padding:8px 12px;gap:8px;background:var(--surface-solid);backdrop-filter:none;min-height:58px}
- :root[data-app-id] .brand{font-size:16px;min-width:0}
- :root[data-app-id] .brand-copy b{font-weight:500}
- :root[data-app-id] .appearance-controls{gap:2px;margin-left:auto}
- :root[data-app-id] .theme-switch button{min-height:32px;min-width:30px;padding:4px 7px}
- :root[data-app-id] .appearance-controls>button{min-height:34px;min-width:30px;font-size:14px}
- :root[data-app-id] .desk-only{display:none}
- :root[data-app-id] .drawer-toggle{display:inline-flex;align-items:center;justify-content:center;background:var(--surface);border:.5px solid var(--border);border-radius:7px;width:38px;height:38px;min-width:38px;min-height:38px;padding:4px}
- :root[data-app-id] [data-drawer]{position:fixed;inset:0 auto 0 0;width:min(300px,calc(100vw - 32px));max-height:100dvh;height:100dvh;overflow:auto;z-index:301;display:flex;flex-direction:column;transform:translateX(-105%);visibility:hidden;border-radius:0 13px 13px 0;background:var(--surface-solid);padding:18px 14px;border:0;box-shadow:var(--shadow);transition:transform .2s,visibility .2s}
- :root[data-app-id] .drawer-open [data-drawer]{transform:translateX(0);visibility:visible}
- :root[data-app-id] [data-drawer] nav{display:flex;flex-direction:column}
- :root[data-app-id] [data-drawer] .drawer-close{display:flex;align-self:flex-end;margin-bottom:16px}
- :root[data-app-id] .drawer-open .drawer-backdrop{display:block;position:fixed;inset:0;z-index:300;width:100%;height:100dvh;background:rgba(13,17,23,.55);padding:0;border:0;border-radius:0}
- :root[data-app-id] .topbar nav[data-drawer] a{display:block;min-height:42px;border-radius:7px}
- :root[data-app-id] .card,:root[data-app-id] .panel,:root[data-app-id] .settings-card,:root[data-app-id] .filter-panel{padding:16px}
- :root[data-app-id] .field-grid,:root[data-app-id] .form-grid,:root[data-app-id] .grid2{grid-template-columns:minmax(0,1fr)}
- :root[data-app-id] .span-2{grid-column:1}
- :root[data-app-id] .action-row,:root[data-app-id] .button-row{gap:8px}
- :root[data-app-id] .action-row>button,:root[data-app-id] .button-row>button{flex:1 1 120px;white-space:normal}
- :root[data-app-id] .form-actions-sticky{position:static;padding:0;margin-top:18px;border:0;background:none}
- :root[data-app-id] .movie-modal,:root[data-app-id] .modal{max-height:calc(100dvh - 24px);overflow:auto}
- :root[data-app-id] .about-dialog,:root[data-app-id] .appearance-panel{padding:22px 18px}
- :root[data-app-id=movie] .page-wrap{padding:22px 14px 40px}
- :root[data-app-id=movie] .admin-layout{display:block}
- :root[data-app-id=movie] .admin-nav{display:none}
- :root[data-app-id=movie] .admin-section-picker{display:flex;flex-direction:column;gap:6px;margin-bottom:20px;color:var(--muted)}
- :root[data-app-id=movie] .top-actions{width:auto;margin-left:auto;gap:6px}
- :root[data-app-id=movie] .user-chip{padding:4px;font-size:0}
- :root[data-app-id=movie] .user-chip>span{font-size:13px}
- :root[data-app-id=movie] .intro-row{flex-wrap:wrap;gap:14px}
- :root[data-app-id=movie] .intro-row h1{font-size:23px}
- :root[data-app-id=movie] .picker-layout,:root[data-app-id=movie] .movie-stage{grid-template-columns:minmax(0,1fr)}
- :root[data-app-id=movie] .poster-wrap{aspect-ratio:2/3;max-height:none;width:min(250px,100%);height:auto;margin:20px auto 0}
- :root[data-app-id=movie] .poster-wrap img{width:100%;height:100%;object-fit:cover}
- :root[data-app-id=movie] .movie-copy{padding:24px 18px}
- :root[data-app-id=movie] .movie-copy h2{font-size:24px}
- :root[data-app-id=movie] .movie-grid{grid-template-columns:1fr;gap:14px}
- :root[data-app-id=movie] .movie-card{display:grid;grid-template-columns:104px minmax(0,1fr);gap:8px 16px;background:var(--surface);border:.5px solid var(--border);border-radius:10px;padding:12px}
- :root[data-app-id=movie] .card-poster{grid-row:1/4;margin:0}
- :root[data-app-id=movie] .movie-card b{white-space:normal;font-size:15px;align-self:end}
- :root[data-app-id=movie] .movie-card small{white-space:normal}
- :root[data-app-id=movie] .movie-modal{display:block}
- :root[data-app-id=movie] .movie-modal>img{width:150px;aspect-ratio:2/3;max-height:none;display:block;margin:24px auto}
- :root[data-app-id=relay] .workspace,:root[data-app-id=hub] .shell{display:block;padding:80px 14px 16px}
- :root[data-app-id=relay] .main-panel,:root[data-app-id=hub] .workspace{margin:0;min-height:calc(100dvh - 100px)}
- :root[data-app-id=relay] .topbar h1{font-size:15px}
- :root[data-app-id=relay] .sync-state{display:none}
- :root[data-app-id=relay] .topbar-actions{gap:5px}
- :root[data-app-id=relay] .messages-view,:root[data-app-id=relay] .settings-view{padding:0}
- :root[data-app-id=relay] .message-avatar{display:none}
- :root[data-app-id=relay] .bubble{padding:10px 13px}
- :root[data-app-id=relay] .composer{padding:6px 0 calc(6px + env(safe-area-inset-bottom))}
- :root[data-app-id=relay] .composer textarea{min-height:42px;max-height:96px;font-size:16px}
- :root[data-app-id=relay] .composer-toolbar{gap:6px;padding:2px 8px 8px}
- :root[data-app-id=relay] .composer-tools{gap:3px}
- :root[data-app-id=relay] .composer-tools label.privacy-option{font-size:12px}
- :root[data-app-id=relay] .composer-tools label.privacy-option input{min-height:0}
- :root[data-app-id=relay] .retention select{font-size:12px;max-width:122px}
- :root[data-app-id=relay] #mobile-menu{display:inline-flex}
- :root[data-app-id=relay] .auth-box{padding:24px 20px}
- :root[data-app-id=hub] .content{padding:0}
- :root[data-app-id=hub] .stats{display:grid;grid-template-columns:1fr;gap:8px}
- :root[data-app-id=hub] .stats article{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:12px 16px}
- :root[data-app-id=hub] .stats article>strong{font-size:21px;margin:0}
- :root[data-app-id=hub] .stats article>small{grid-column:1/-1;margin:0}
- :root[data-app-id=hub] .release-summary{grid-template-columns:1fr;gap:10px}
- :root[data-app-id=hub] .release-summary>div:first-child{flex-direction:row;align-items:center;gap:12px}
- :root[data-app-id=hub] .release-summary>div:first-child>small{display:none}
- :root[data-app-id=hub] .sidebar .project-select,:root[data-app-id=hub] .sidebar .new-project{display:block;grid-column:auto;grid-row:auto;width:100%}
- :root[data-app-id=hub] .sidebar .project-select{margin:16px 0}
- :root[data-app-id=hub] .sidebar-footer{margin-top:auto}
- :root[data-app-id=hub] .top-status{display:none}
- .mobile-records table,.mobile-records tbody,.mobile-records tr{display:block;width:100%;white-space:normal}
- .mobile-records thead{display:none}
- .mobile-records tr{padding:12px 0;border-bottom:.5px solid var(--border)}
- .mobile-records td{display:flex;gap:12px;padding:8px 0;border:0}
- .mobile-records td::before{content:attr(data-label);flex:0 0 72px;color:var(--muted);font-size:12px}
-}
-@media(max-width:375px){:root[data-app-id] .topbar{gap:5px;padding-inline:10px}:root[data-app-id] .brand{font-size:14px}.appearance-controls{gap:0}:root[data-app-id] .appearance-controls>button{min-width:28px;padding:4px}:root[data-app-id] .theme-switch button{min-width:28px;padding:4px 6px}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
-
-/* Reference navigation is a flat list, not a stack of separate cards. */
-:root[data-app-id] .sidebar nav button:not(.primary):not(.on),
-:root[data-app-id] .admin-nav>button:not(.primary):not(.on){background:transparent;border-color:transparent;justify-content:flex-start;font-weight:400}
-:root[data-app-id] .sidebar nav button.active:not(.primary):not(.on),
-:root[data-app-id] .admin-nav>button.active:not(.primary):not(.on){background:var(--grad-accent);color:var(--on-accent);font-weight:500}
-:root[data-app-id] .sidebar nav button:not(.active):hover,
-:root[data-app-id] .admin-nav>button:not(.active):hover{background:var(--accent-soft)}
-:root[data-app-id=hub] .shell{width:100%}
-:root[data-app-id=hub] .space-label{margin:4px 8px 12px}
-:root[data-app-id=hub] .sidebar nav{gap:2px}
-:root[data-app-id=hub] .sidebar nav button i{display:none}
-:root[data-app-id=relay] .topbar>.brand{order:-1}
-:root[data-app-id=relay] .topbar>div:first-child{flex:1;text-align:center}
-:root[data-app-id=relay] .topbar h1{font-size:14px;color:var(--muted)}
-:root[data-app-id] .appearance-options button.on{background:var(--grad-accent);color:var(--on-accent)}
-@media(max-width:768px){
- :root[data-app-id] .theme-switch button,:root[data-app-id] .appearance-controls>button{min-width:36px;min-height:40px}
- :root[data-app-id=relay] .topbar>div:first-child{display:none}
-}
-
-@media(max-width:768px){
- :root[data-app-id] button,:root[data-app-id] .button{min-height:44px}
+:root[data-app-id] .theme-switch{display:flex;gap:2px;padding:3px;border:.5px solid var(--border);border-radius:999px;background:var(--surface)}
+:root[data-app-id] .theme-switch button{min-width:32px;min-height:30px;padding:4px 8px;line-height:1.4;border:0;border-radius:999px;background:transparent;color:var(--muted);box-shadow:none;font-size:13px}
+:root[data-app-id] .theme-switch button.on,:root[data-app-id] .appearance-options button.on{background:var(--grad-accent);color:var(--on-accent)}
+:root[data-app-id] .appearance-controls>button{min-width:32px;min-height:32px;padding:4px 7px;border:0;border-radius:7px;background:transparent}
+:root[data-app-id=relay] .auth-panel{position:relative}
+:root[data-app-id=relay] .auth-box>.appearance-controls{position:absolute;top:22px;right:26px}
+:root[data-app-id=hub] .login-form{position:relative}
+:root[data-app-id=hub] .login-form>.appearance-controls{position:absolute;top:22px;right:26px}
+.about-dialog{width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:26px;border:.5px solid var(--border);border-radius:13px;background:var(--surface-solid);color:var(--text);box-shadow:var(--shadow)}
+.about-dialog::backdrop{background:rgba(13,17,23,.65)}
+.about-actions,.appearance-options{display:flex;gap:10px;flex-wrap:wrap}.about-actions{justify-content:flex-end;margin-top:20px}
+.about-dialog button{padding:9px 16px;border:.5px solid var(--border);border-radius:7px}
+.about-meta{display:grid;grid-template-columns:80px minmax(0,1fr);gap:10px;margin:20px 0}.about-meta dd{margin:0;overflow-wrap:anywhere}.about-meta dt{color:var(--muted)}
+.about-page{max-width:900px;margin:0 auto;padding:28px}.about-page .card{padding:24px;margin:20px 0;border:.5px solid var(--border)}.about-page header{display:flex;align-items:center;gap:16px}
+.site-footer,.sidebar-copyright{color:var(--muted);font-size:12px}.site-footer button,.sidebar-copyright button{background:none;color:var(--muted);border:0}
+.sidebar-copyright{padding-top:14px}.site-footer{border-color:var(--border)}.site-footer>span+button{margin-left:12px}
+.drawer-toggle,.drawer-close,.drawer-backdrop,.admin-section-picker,.admin-nav-title{display:none}
+.release-toolbar{display:flex;flex-wrap:wrap;align-items:end;gap:16px;margin-bottom:20px}.release-toolbar label{flex:1 1 180px}.release-toolbar p{flex:1 1 220px}
+@media(max-width:700px){
  :root[data-app-id] .appearance-controls [data-theme-choice],:root[data-app-id] .appearance-controls [data-about-open]{display:none}
- :root[data-app-id] .theme-switch button,:root[data-app-id] .appearance-controls>button,:root[data-app-id] .drawer-toggle{min-width:44px;min-height:44px}
- :root[data-app-id] .theme-switch{padding:0;border:0;background:transparent}
- :root[data-app-id=hub] .sidebar[data-drawer],:root[data-app-id=relay] .sidebar[data-drawer]{width:min(300px,calc(100vw - 32px));top:0;max-height:100dvh}
+ :root[data-app-id] .appearance-controls button{min-width:40px;min-height:40px}
+ :root[data-app-id=relay] .auth-box>.appearance-controls,:root[data-app-id=hub] .login-form>.appearance-controls{top:12px;right:20px}
+ :root[data-app-id=relay] .drawer-close{display:block;align-self:flex-end;margin-bottom:10px}
+ :root[data-app-id=relay] .drawer-open .drawer-backdrop{display:block;position:fixed;inset:0;z-index:19;background:rgba(13,17,23,.55);width:100%;height:100dvh}
+ :root[data-app-id=relay] .sidebar{z-index:20}
+ .release-toolbar{display:block}.release-toolbar label{margin-bottom:12px}
 }
 
-:root[data-app-id] .empty,:root[data-app-id] .empty h2,:root[data-app-id] .empty p{color:var(--muted)}
-:root[data-app-id] .empty>span{background:var(--accent-soft);color:var(--accent)}
-:root[data-app-id=relay] .sidebar nav em{background:var(--accent-soft);color:var(--accent)}
+.ui-icon{display:inline-block;width:18px;height:18px;vertical-align:middle;flex-shrink:0}
+.nav-icon{display:inline-flex;align-items:center;justify-content:center;line-height:1;color:inherit}
+:root[data-app-id] .sidebar nav button.active .nav-icon,:root[data-app-id] .admin-nav>button.active .nav-icon{color:inherit}
+
+/* Contrast corrections only; no geometry or positioning changes. */
+:root[data-app-id] label,:root[data-app-id] .topbar b{color:var(--text)}
+:root[data-app-id] .stats strong{color:var(--accent)}
+:root[data-app-id] .stats span,:root[data-app-id] .eyebrow,:root[data-app-id] .file-info small,:root[data-app-id] .space-label,:root[data-app-id] .sidebar:after{color:var(--muted)}
+:root[data-app-id] .sidebar nav button i,:root[data-app-id] .stats article:after{background:var(--accent)}
+:root[data-app-id] .badge.green,:root[data-app-id] .alert.success{background:var(--mint-soft);color:var(--ok)}
+:root[data-app-id] .badge.gray,:root[data-app-id] input:disabled{background:var(--surface-hover);color:var(--muted)}
+:root[data-app-id] .hint,:root[data-app-id] .editor-preview{background:var(--accent-soft);color:var(--text)}
+:root[data-app-id] .alert.error{background:var(--surface-solid);color:var(--err);border-color:var(--err)}
+:root[data-app-id] .sample-card>span,:root[data-app-id] .release-notes a{color:var(--accent)}
+:root[data-app-id] .release-notes blockquote{color:var(--muted);border-color:var(--accent)}
+
+:root[data-app-id] .composer-inner,:root[data-app-id] .attachment-tag{background:var(--surface-solid);color:var(--text);border-color:var(--border)}
+:root[data-app-id] .attachments,:root[data-app-id] .file-icon,:root[data-app-id] .image-placeholder{background:var(--accent-soft);color:var(--accent);border-color:var(--border)}

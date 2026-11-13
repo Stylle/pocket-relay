@@ -7,7 +7,7 @@
  const choices = ["light", "dark", "system"];
  const media = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
  let choice = root.dataset.defaultTheme || "system";
- let palette="solid"; try {if(localStorage.getItem(id+"_style")==="gradient")palette="gradient"}catch{}
+ const palette="solid"; // Colorful mode is retired; old preferences are intentionally ignored.
  const tr=s=>window.AppI18n?window.AppI18n.t(s):s;
  try { const saved = localStorage.getItem(key); if (choices.includes(saved)) choice = saved; } catch {}
  function sync() {
@@ -16,7 +16,6 @@
   document.querySelectorAll("[data-appearance-open],[data-about-open],[data-theme-choice]").forEach(el=>{const label=el.hasAttribute("data-appearance-open")?"外观设置":el.hasAttribute("data-about-open")?"关于":({light:"亮色",dark:"暗色",system:"跟随系统"}[el.dataset.themeChoice]);if(label){el.setAttribute("aria-label",tr(label));el.title=tr(label)}});
   root.style.colorScheme=choice==="system"?(media&&media.matches?"dark":"light"):choice;
   document.querySelectorAll("[data-theme-choice]").forEach(el=>{el.classList.toggle("on",el.dataset.themeChoice===choice);el.setAttribute("aria-pressed",String(el.dataset.themeChoice===choice))});
-  document.querySelectorAll("[data-style-choice]").forEach(el=>{el.classList.toggle("on",el.dataset.styleChoice===palette);el.setAttribute("aria-pressed",String(el.dataset.styleChoice===palette))});
   root.dataset.theme = choice === "system" ? (media && media.matches ? "dark" : "light") : choice;
   document.querySelectorAll("[data-theme-select]").forEach(el => { el.value = choice; });
   const meta = document.querySelector('meta[name="theme-color"]');
@@ -32,7 +31,6 @@
  if (media && media.addEventListener) media.addEventListener("change", sync);
  window.addEventListener("storage", event => {
   if (event.key === key) apply(event.newValue || root.dataset.defaultTheme || "system", false);
-  if(event.key===id+"_style"){palette=event.newValue==="gradient"?"gradient":"solid";sync()}
  });
  window.addEventListener("appearance-ready", sync);
  window.addEventListener("ui-language-change",sync);
@@ -43,7 +41,7 @@
  let appearance;
  function showAppearance(){
   if(!appearance){appearance=el("dialog",undefined,"about-dialog");appearance.setAttribute("aria-label","Appearance");appearance.append(el("h2","界面与语言"));
-   const sections=[["主题",["light","dark","system"],["亮色","暗色","跟随系统"],"themeChoice"],["配色",["solid","gradient"],["纯色","炫彩"],"styleChoice"],["语言",["zh","en"],["中文","English"],"languageChoice"]];
+   const sections=[["主题",["light","dark","system"],["亮色","暗色","跟随系统"],"themeChoice"],["语言",["zh","en"],["中文","English"],"languageChoice"]];
    for(const [title,values,labels,field]of sections){appearance.append(el("h3",title));const row=el("div",undefined,"row appearance-options");values.forEach((value,i)=>{const b=el("button",labels[i]);b.type="button";b.dataset[field]=value;row.append(b)});appearance.append(row)}
    const actions=el("div",undefined,"about-actions");const close=el("button","关闭","primary");close.type="button";close.addEventListener("click",()=>appearance.close());actions.append(close);appearance.append(actions);document.body.append(appearance)
   }sync();if(!appearance.open)appearance.showModal();
@@ -101,7 +99,7 @@
  function openDrawer(host, trigger) {
   if (drawerHost === host) { closeDrawer(); return; }
   closeDrawer(); drawerHost = host; returnFocus = trigger;
-  host.classList.add("drawer-open");
+  host.classList.add("drawer-open", "menu-open");
   host.querySelectorAll("[data-drawer-toggle]").forEach(button => button.setAttribute("aria-expanded","true"));
   const drawer = host.querySelector("[data-drawer]");
   if (drawer) {
@@ -117,7 +115,6 @@
   const target = event.target.closest("button,a");
   if (!target) return;
   if(target.matches("[data-theme-choice]"))apply(target.dataset.themeChoice,true);
-  if(target.matches("[data-style-choice]")){palette=target.dataset.styleChoice;try{localStorage.setItem(id+"_style",palette)}catch{}sync()}
   if(target.matches("[data-language-choice]")&&window.AppI18n)window.AppI18n.set(target.dataset.languageChoice);
   if(target.matches("[data-lang-toggle]")&&window.AppI18n)window.AppI18n.set(window.AppI18n.lang==="zh"?"en":"zh");
   if(target.matches("[data-appearance-open]")){event.preventDefault();showAppearance()}
@@ -139,7 +136,7 @@
  });
  window.addEventListener("hashchange",closeDrawer);
  if (window.matchMedia) {
-  const desktop = window.matchMedia("(min-width:769px)");
+  const desktop = window.matchMedia("(min-width:701px)");
   if (desktop.addEventListener) desktop.addEventListener("change", event => { if (event.matches) closeDrawer(); });
  }
  function ready() { sync(); }
