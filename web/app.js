@@ -28,6 +28,10 @@ const state = {
   hasMore: false,
 };
 let toastTimer;
+let booting = true;
+let messageRequest;
+let renderedRows = new Map();
+const dateFormatter = new Intl.DateTimeFormat("zh-CN", {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
 let navigationType = "navigate";
 try {
   navigationType =
@@ -99,14 +103,7 @@ function size(n) {
   if (n < 1024 ** 3) return (n / 1024 ** 2).toFixed(1) + " MB";
   return (n / 1024 ** 3).toFixed(2) + " GB";
 }
-function date(n) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(n));
-}
+function date(n) { return dateFormatter.format(n); }
 async function api(path, options = {}) {
   const requestToken = state.token;
   const headers = new Headers(options.headers);
@@ -127,7 +124,9 @@ async function api(path, options = {}) {
       logoutLocal();
       toast(b.error || tr("请重新验证"), true);
     }
-    throw Error(b.error || "请求失败，请检查网络（" + res.status + "）");
+    const error = Error(b.error || "请求失败，请检查网络（" + res.status + "）");
+    error.status = res.status;
+    throw error;
   }
   return res;
 }
@@ -189,6 +188,7 @@ async function enterWorkspace(result) {
   $("qr").removeAttribute("src");
   state.enrollment = "";
   $("auth").hidden = true;
+  $("session-loading").hidden = true;
   $("workspace").hidden = false;
   $("account-name").textContent = result.user.name;
   $("account-avatar").textContent = result.user.name.slice(0, 1);
@@ -201,6 +201,7 @@ async function enterWorkspace(result) {
   await setView("messages");
 }
 async function boot() {
+  let failed = false;
   try {
     state.status = await json("/api/status");
     $("account").value = saved("pr-account");
@@ -213,8 +214,7 @@ async function boot() {
         return;
       } catch (e) {
         if (state.token) {
-          $("auth-error").textContent = tr("连接服务失败，请刷新重试。");
-          return;
+          throw e;
         }
       }
     }
@@ -223,13 +223,26 @@ async function boot() {
         const result = await json("/api/session/restore", { method: "POST" });
         await enterWorkspace(result);
         return;
-      } catch (_) {}
+      } catch (error) { if (error.status !== 401) throw error; }
     }
     authMode(state.status.setup ? "register" : "login");
   } catch (e) {
-    $("auth-error").textContent = tr("连接服务失败，请刷新重试。");
+    failed = true;
+    $("session-loading-text").textContent = tr("连接服务失败，请刷新重试。");
+    $("session-retry").hidden = false;
+  } finally {
+    booting = false;
+    $("session-loading").hidden = !failed;
+    $("auth").hidden = failed || !!state.user;
   }
 }
+$("session-retry").onclick = () => location.reload();
+document.querySelector("#relay-nav .brand").addEventListener("click", event => {
+  if (!state.user) return;
+  event.preventDefault();
+  document.querySelector(".drawer-backdrop").click();
+  setView("messages").catch(error => toast(error.message, true));
+});
 $("auth-switch").onclick = () =>
   authMode(state.mode === "login" ? "register" : "login");
 $("secret-copy").onclick = () => copyText($("secret-copy").textContent);
@@ -283,6 +296,9 @@ $("auth-form").onsubmit = async (e) => {
   }
 };
 function logoutLocal() {
+  cancelMessageRequest();
+  renderedRows.clear();
+  closeSearch();
   closeOriginal();
   state.privacyRevision = null;
   $("tg-token").value = "";
@@ -302,8 +318,9 @@ function logoutLocal() {
   state.older = [];
   state.signature = "";
   $("workspace").hidden = true;
-  $("auth").hidden = false;
+  $("auth").hidden = booting;
   $("timeline").replaceChildren();
+  $("message-count").textContent = "0";
   $("message-text").value = "";
   renderAttachments();
   authMode("login");
@@ -324,7 +341,22 @@ document
         setView(b.dataset.view).catch((e) => toast(e.message, true))),
   );
 // Drawer, theme and About are handled by appearance.js; session state stays here.
+function cancelMessageRequest() {
+  if (messageRequest) messageRequest.abort();
+  messageRequest = null;
+  state.polling = false;
+}
+function showMessageLoading() {
+  renderedRows.clear();
+  const status = uiNode("p", "muted small", "正在加载…");
+  status.setAttribute("role", "status");
+  $("timeline").replaceChildren(status);
+  $("timeline").setAttribute("aria-busy", "true");
+}
 async function setView(view) {
+  if (view === state.view && state.token && state.signature && !state.filters) { closeSearch(); return; }
+  cancelMessageRequest();
+  closeSearch();
   closeOriginal();
   state.generation++;
   state.polling = false;
@@ -340,7 +372,7 @@ async function setView(view) {
       ? tr("历史已折叠；搜索默认覆盖全部记录。")
       : tr("搜索默认覆盖全部文字记录。"));
   state.view = view;
-  $("search-form").hidden = view !== "all";
+  $("open-search").hidden = view !== "all";
   $("workspace").classList.remove("menu-open", "drawer-open");
   document
     .querySelectorAll("[data-view]")
@@ -348,7 +380,7 @@ async function setView(view) {
   uiText($("view-title"),{
     messages: tr("本次消息"),
     all: tr("全部信息"),
-    files: tr("文件与影像"),
+    files: tr("文件信息"),
     settings: tr("设备设置"),
     admin: tr("管理后台"),
   }[view]);
@@ -359,7 +391,7 @@ async function setView(view) {
   if (view === "admin") await loadAdmin();
   else if (["messages", "all", "files"].includes(view)) {
     state.signature = "";
-    renderMessages();
+    showMessageLoading();
     await refresh();
   }
 }
@@ -616,15 +648,13 @@ async function loadPreview(element, m, attempt = 0) {
 }
 function renderMessages() {
   const timeline = $("timeline");
-  const all = [...state.older, ...state.messages]
-    .filter(
-      (m, i, arr) =>
-        arr.findIndex((x) => x.id === m.id) === i &&
-        (!m.expires || m.expires > Date.now() / 1000) &&
-        (state.view !== "files" || m.file_id),
-    )
-    .sort((a, b) => a.created - b.created || a.id.localeCompare(b.id));
-  const fragment = document.createDocumentFragment();
+  const seen = new Set(), now = Date.now() / 1000;
+  const all = [...state.older, ...state.messages].filter(m => {
+    if (seen.has(m.id) || (m.expires && m.expires <= now) || (state.view === "files" && !m.file_id)) return false;
+    seen.add(m.id); return true;
+  }).sort((a,b) => a.created-b.created || a.id.localeCompare(b.id));
+  const nextRows = new Map();
+  const rows = [];
   if (!all.length) {
     const empty = node("div", "empty");
     empty.append(
@@ -646,9 +676,14 @@ function renderMessages() {
     } else if (state.filters) {
       empty.replaceChildren(uiNode("h2", "", "没有找到符合条件的消息。"));
     }
-    fragment.append(empty);
+    rows.push(empty);
   }
   for (const m of all) {
+    const key = JSON.stringify([m, state.privacyRevision, state.generation, state.autoLoadImages, state.loadedImages.has(m.id), state.revealed.get(m.id), window.AppI18n?.lang]);
+    const existing = renderedRows.get(m.id);
+    if (existing && existing.key === key) {
+      rows.push(existing.row); nextRows.set(m.id, existing); continue;
+    }
     const row = node("article", "message");
     const avatar = node(
       "span",
@@ -764,14 +799,36 @@ function renderMessages() {
     );
     content.append(meta, bubble, actions);
     row.append(avatar, content);
-    fragment.append(row);
+    rows.push(row);
+    nextRows.set(m.id, {key, row});
   }
-  timeline.replaceChildren(fragment);
-  $("message-count").textContent = String(
-    state.messages.length + state.older.length,
-  );
+  renderedRows = nextRows;
+  // Keep unchanged rows mounted (especially video/audio); reconcile only moved/new nodes.
+  for (let i = 0; i < rows.length; i++) {
+    if (timeline.children[i] !== rows[i]) timeline.insertBefore(rows[i], timeline.children[i] || null);
+  }
+  while (timeline.children.length > rows.length) timeline.lastElementChild.remove();
+  timeline.setAttribute("aria-busy", "false");
   $("load-older").hidden = !state.hasMore;
 }
+function closeSearch() {
+  if ($("search-dialog").open) $("search-dialog").close();
+}
+$("open-search").onclick = () => {
+  if (state.view !== "all" || !state.user) return;
+  if (!$("search-dialog").open) $("search-dialog").showModal();
+  $("search-text").focus();
+};
+$("close-search").onclick = closeSearch;
+$("search-dialog").addEventListener("close", () => {
+  if (!$("open-search").hidden && !$("workspace").hidden) $("open-search").focus();
+});
+$("search-dialog").addEventListener("click", event => {
+  if (event.target !== $("search-dialog")) return;
+  const rect = event.target.getBoundingClientRect();
+  if (event.clientX < rect.left || event.clientX > rect.right ||
+      event.clientY < rect.top || event.clientY > rect.bottom) closeSearch();
+});
 $("search-period").onchange = () => {
   const custom = $("search-period").value === "custom";
   $("search-custom").hidden = !custom;
@@ -803,7 +860,9 @@ $("search-form").onsubmit = async (event) => {
     query.set("from", from);
     query.set("to", to);
   }
+  cancelMessageRequest();
   state.filters = query.toString();
+  closeSearch();
   // A global text search must not silently retain the file-only view filter.
   state.view = "all";
   document
@@ -815,7 +874,7 @@ $("search-form").onsubmit = async (event) => {
   state.messages = [];
   state.hasMore = false;
   state.signature = "";
-  renderMessages();
+  showMessageLoading();
   uiText($("view-title"),tr("搜索结果 · 全部记录"));
   uiText($("search-status"),tr("搜索范围：此账户的全部记录（含已折叠历史）。"));
   await refresh();
@@ -833,9 +892,12 @@ async function refresh() {
   if (!state.token || state.polling) return;
   if (!["messages", "all", "files"].includes(state.view)) return;
   const generation = state.generation;
+  const controller = new AbortController();
+  messageRequest = controller;
   state.polling = true;
   try {
     const response = await api("/api/messages?" + messageQuery(), {
+      signal: controller.signal,
       headers:
         state.signature && state.etag ? { "If-None-Match": state.etag } : {},
     });
@@ -848,6 +910,11 @@ async function refresh() {
     state.etag = response.headers.get("ETag") || "";
     const result = await response.json();
     if (generation !== state.generation) return;
+    if (Number.isSafeInteger(result.current_count) && result.current_count >= 0) {
+      $("message-count").textContent = String(result.current_count);
+    } else if (state.view === "messages") {
+      $("message-count").textContent = String(new Set([...result.messages, ...state.older].map(m => m.id)).size);
+    }
     state.maxMB = result.max_file_mb;
     state.autoLoadImages = result.auto_load_images !== false;
     document.documentElement.dataset.messageSize = [
@@ -892,11 +959,14 @@ async function refresh() {
     $("sync-state").classList.remove("offline");
     $("sync-state").lastChild.textContent = tr("已同步");
   } catch (e) {
-    if (generation !== state.generation || !state.token) return;
+    if (generation !== state.generation || !state.token || controller.signal.aborted) return;
+    $("timeline").setAttribute("aria-busy", "false");
+    if (!state.signature) $("timeline").replaceChildren(uiNode("p","muted small","连接服务失败，请刷新重试。"));
     $("sync-state").classList.add("offline");
     $("sync-state").lastChild.textContent = tr("连接中断");
   } finally {
     if (generation === state.generation) state.polling = false;
+    if (messageRequest === controller) messageRequest = null;
   }
 }
 $("load-older").onclick = async () =>
@@ -1133,8 +1203,10 @@ function showTelegramStatus(result) {
   if (result.last_error) pieces.push(result.last_error);
   $("tg-status").textContent = pieces.join(" · ");
 }
-async function loadTelegram() {
-  const result = await json("/api/admin/telegram");
+async function loadTelegram(prefetched) {
+  const generation = state.generation;
+  const result = prefetched || await json("/api/admin/telegram");
+  if (generation !== state.generation || !state.admin || !state.user) return;
   const cfg = result.config || {};
   telegramRevision = result.revision || "";
   $("tg-enabled").checked = !!cfg.enabled;
@@ -1238,8 +1310,12 @@ setInterval(async () => {
 }, 10000);
 
 async function loadAdmin() {
-  state.admin = await json("/api/admin");
-  await loadTelegram();
+  const generation = state.generation;
+  const [admin, telegram] = await Promise.all([json("/api/admin"), json("/api/admin/telegram")]);
+  if (generation !== state.generation || !state.user) return;
+  state.admin = admin;
+  await loadTelegram(telegram);
+  if (generation !== state.generation || !state.user) return;
   const s = state.admin.settings;
   $("public-registration").checked = s.public_registration;
   $("auto-load-images").checked = s.auto_load_images !== false;

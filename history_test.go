@@ -63,6 +63,11 @@ func TestHistoryScopeAndSearch(t *testing.T) {
 	if len(current) != 1 || current[0].(map[string]any)["id"] != "new" {
 		t.Fatal("current session includes history")
 	}
+	for _, path := range []string{"/api/messages?scope=current", "/api/messages?scope=all", "/api/messages?files=1", "/api/messages?q=not-found", "/api/messages?before=1"} {
+		if list(path, token)["current_count"] != float64(1) {
+			t.Fatalf("current badge depends on list filters: %s", path)
+		}
+	}
 	full := list("/api/messages?scope=all", token)
 	if len(full["messages"].([]any)) != 100 || full["has_more"] != true {
 		t.Fatal("missing pagination")

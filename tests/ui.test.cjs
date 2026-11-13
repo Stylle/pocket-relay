@@ -31,6 +31,9 @@ function fixture(
     revealText = "revealed test body",
     messageSize = "medium",
     language = false,
+    restoreWait,
+    restoreStatus,
+    currentCount,
   } = {},
 ) {
   const dom = new JSDOM(html, {
@@ -40,6 +43,9 @@ function fixture(
   });
   t.after(() => dom.window.close());
   const w = dom.window;
+  // jsdom does not implement native dialog lifecycle; real-browser QA checks it too.
+  w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  w.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new w.Event("close")); };
   const calls = [];
   let tgConfig = {
     enabled: false,
@@ -64,6 +70,8 @@ function fixture(
     calls.push({ path, opts });
     let value;
     if (path === "/api/session/restore") {
+      if (restoreWait) await restoreWait;
+      if (restoreStatus) return new Response(JSON.stringify({error:"restore temporarily unavailable"}),{status:restoreStatus});
       if (!remembered)
         return new Response(JSON.stringify({ error: "not remembered" }), {
           status: 401,
@@ -127,6 +135,7 @@ function fixture(
           ? { id: "new-message" }
           : {
               messages,
+              current_count: currentCount,
               user,
               device_template: "{device} · {ip}",
               max_file_mb: 256,
@@ -173,7 +182,7 @@ function fixture(
   w.eval(fs.readFileSync("web/message-text.js", "utf8"));
   w.eval(
     script +
-      "\nwindow.__test={state,setView,renderAttachments,browserSession,recordActivity,flushActivity,expireSession};",
+      "\nwindow.__test={state,setView,refresh,renderMessages,renderAttachments,browserSession,recordActivity,flushActivity,expireSession};",
   );
   return { w, $: (id) => w.document.getElementById(id), calls };
 }
@@ -442,12 +451,18 @@ test("history is folded at login and search defaults to all records with custom 
   await settle();
   await login(f);
   assert.ok(f.calls.some((c) => c.path === "/api/messages?scope=current"));
-  assert.equal(f.$("search-form").hidden, true);
+  assert.equal(f.$("open-search").hidden, true);
+  assert.equal(f.$("search-dialog").open, false);
   await f.w.__test.setView("all");
-  assert.equal(f.$("search-form").hidden, false);
+  assert.equal(f.$("open-search").hidden, false);
+  assert.equal(f.$("search-dialog").open, false);
+  f.$("open-search").click();
+  assert.equal(f.$("search-dialog").open, true);
+  assert.equal(f.w.document.activeElement, f.$("search-text"));
   assert.ok(f.calls.some((c) => c.path === "/api/messages?scope=all"));
   await f.w.__test.setView("files");
-  assert.equal(f.$("search-form").hidden, true);
+  assert.equal(f.$("open-search").hidden, true);
+  assert.equal(f.$("search-dialog").open, false);
   await f.w.__test.setView("all");
   f.$("search-text").value = "测试 %_";
   f.$("search-period").value = "custom";
@@ -466,6 +481,8 @@ test("history is folded at login and search defaults to all records with custom 
   assert.equal(query.has("files"), false);
   assert.equal(f.w.__test.state.view, "all");
   assert.equal(query.get("q"), "测试 %_");
+  assert.equal(f.$("search-dialog").open, false);
+  assert.equal(f.w.document.activeElement, f.$("open-search"));
   assert.ok(Number(query.get("from")) < Number(query.get("to")));
   f.$("clear-search").click();
   await settle();
@@ -824,11 +841,110 @@ test("drawer waits for paint before focusing and returns focus on close",async t
  const f=fixture(t);await settle();await login(f);
  const frames=[];f.w.requestAnimationFrame=fn=>{frames.push(fn);return frames.length};
  f.w.eval(fs.readFileSync("web/appearance.js","utf8"));
- const trigger=f.$("mobile-menu"),close=f.w.document.querySelector('#relay-nav [data-drawer-close]');
- for(const el of f.w.document.querySelectorAll('#relay-nav button'))el.getClientRects=()=>[{width:44,height:44}];
- trigger.click();assert.notEqual(f.w.document.activeElement,close);
+ const trigger=f.$("mobile-menu"),first=f.w.document.querySelector('#relay-nav a'),close=f.w.document.querySelector('.drawer-backdrop');
+ assert.equal(f.w.document.querySelector('#relay-nav [data-drawer-close]'),null);
+ for(const el of f.w.document.querySelectorAll('#relay-nav button,#relay-nav a'))el.getClientRects=()=>[{width:44,height:44}];
+ trigger.click();assert.notEqual(f.w.document.activeElement,first);
  while(frames.length)frames.shift()();
- assert.equal(f.w.document.activeElement,close);
+ assert.equal(f.w.document.activeElement,first);
  close.click();assert.equal(f.w.document.activeElement,trigger);
  assert.equal(f.$("workspace").classList.contains("drawer-open"),false);
+});
+
+test("search dialog closes on navigation, clear, logout and button without losing composer draft", async t => {
+ const f=fixture(t);await settle();await login(f);
+ assert.ok(f.w.document.querySelector(".inbox-intro-compact"));
+ assert.equal(f.w.document.querySelector(".inbox-intro p"),null);
+ await f.w.__test.setView("all");
+ f.$("message-text").value="draft";
+ f.$("open-search").click();f.$("close-search").click();
+ assert.equal(f.$("search-dialog").open,false);
+ assert.equal(f.w.document.activeElement,f.$("open-search"));
+ f.$("open-search").click();await f.w.__test.setView("files");
+ assert.equal(f.$("search-dialog").open,false);
+ assert.equal(f.$("open-search").hidden,true);
+ assert.equal(f.$("message-text").value,"draft");
+ await f.w.__test.setView("all");f.$("open-search").click();
+ f.$("clear-search").click();await settle();
+ assert.equal(f.$("search-dialog").open,false);
+ f.$("open-search").click();f.$("logout").click();await settle();
+ assert.equal(f.$("search-dialog").open,false);
+});
+
+test("workspace appearance and language live only in sidebar; message actions stay transparent", async t => {
+ const f=fixture(t);await settle();
+ assert.equal(f.w.document.querySelector(".topbar [data-appearance-open]"),null);
+ assert.equal(f.w.document.querySelector(".topbar [data-lang-toggle]"),null);
+ assert.ok(f.w.document.querySelector("#relay-nav [data-appearance-open]"));
+ assert.ok(f.w.document.querySelector("#relay-nav [data-lang-toggle]"));
+ const css=fs.readFileSync("web/design-system.css","utf8");
+ assert.match(css,/\.message-actions a\{background:transparent/);
+ assert.match(css,/\.composer textarea\{min-height:64px/);
+});
+
+test("remembered startup keeps login hidden until validated and network errors do not masquerade as logout", async t => {
+ let release;const gate=new Promise(r=>release=r);
+ const f=fixture(t,{remembered:true,restoreWait:gate});await settle();
+ assert.equal(f.$("auth").hidden,true);
+ assert.equal(f.$("workspace").hidden,true);
+ assert.equal(f.$("session-loading").hidden,false);
+ release();await settle();
+ assert.equal(f.$("auth").hidden,true);
+ assert.equal(f.$("workspace").hidden,false);
+ assert.equal(f.$("session-loading").hidden,true);
+ const failed=fixture(t,{remembered:true,restoreStatus:503});await settle();
+ assert.equal(failed.$("auth").hidden,true);
+ assert.equal(failed.$("session-retry").hidden,false);
+});
+
+test("current-session badge is independent of all/file lists and search",async t=>{
+ const messages=Array.from({length:5},(_,i)=>({id:"m"+i,text:"history",device:"test",created:Date.now()+i,expires:0,file_id:""}));
+ const f=fixture(t,{messages,currentCount:2});await settle();await login(f);
+ assert.equal(f.$("message-count").textContent,"2");
+ for(const view of ["all","files","messages"]) {
+   await f.w.__test.setView(view);
+   assert.equal(f.$("message-count").textContent,"2");
+ }
+ assert.equal(f.w.document.querySelector("nav [data-view]").dataset.view,"all");
+ assert.equal(f.w.__test.state.view,"messages");
+ assert.equal(f.w.document.querySelector('[data-view="files"]').textContent.trim(),"文件信息");
+});
+
+test("home is in-app navigation and repeated menu selection does not refetch or reset draft",async t=>{
+ const f=fixture(t,{remembered:true});await settle();
+ f.$("message-text").value="keep draft";
+ await f.w.__test.setView("all");
+ const anchor=f.w.document.querySelector("#relay-nav .brand");
+ const event=new f.w.MouseEvent("click",{bubbles:true,cancelable:true});
+ anchor.dispatchEvent(event);await settle();
+ assert.equal(event.defaultPrevented,true);
+ assert.equal(f.w.__test.state.view,"messages");
+ assert.equal(f.$("message-text").value,"keep draft");
+ const count=f.calls.length;await f.w.__test.setView("messages");
+ assert.equal(f.calls.length,count);
+ assert.equal(f.$("auth").hidden,true);
+});
+
+test("rapid navigation aborts previous message requests and ignores their late content/count",async t=>{
+ const f=fixture(t,{currentCount:1});await settle();await login(f);
+ const original=f.w.fetch;let release,signal;
+ f.w.fetch=async(path,opts)=>path==="/api/messages?scope=all"?await new Promise(r=>{release=r;signal=opts.signal}):original(path,opts);
+ const old=f.w.__test.setView("all");await settle();
+ await f.w.__test.setView("files");
+ assert.equal(signal.aborted,true);
+ release(new Response(JSON.stringify({messages:[{id:"late",text:"stale",device:"test",created:Date.now()}],current_count:999})));
+ await old;await settle();
+ assert.equal(f.w.__test.state.view,"files");
+ assert.equal(f.$("message-count").textContent,"1");
+ assert.doesNotMatch(f.$("timeline").textContent,/stale/);
+});
+
+test("polling preserves unchanged message rows and media rather than rebuilding everything",async t=>{
+ const messages=[{id:"first",text:"one",device:"test",created:Date.now(),expires:0,file_id:""}];
+ const f=fixture(t,{messages});await settle();await login(f);
+ const first=f.$("timeline").querySelector(".message");
+ messages.push({id:"second",text:"two",device:"test",created:Date.now()+1,expires:0,file_id:""});
+ await f.w.__test.refresh();
+ assert.equal(f.$("timeline").querySelector(".message"),first);
+ assert.equal(f.$("timeline").querySelectorAll(".message").length,2);
 });

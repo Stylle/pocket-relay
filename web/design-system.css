@@ -83,7 +83,6 @@
  :root[data-app-id] .appearance-controls [data-theme-choice],:root[data-app-id] .appearance-controls [data-about-open]{display:none}
  :root[data-app-id] .appearance-controls button{min-width:40px;min-height:40px}
  :root[data-app-id=relay] .auth-box>.appearance-controls,:root[data-app-id=hub] .login-form>.appearance-controls{top:12px;right:20px}
- :root[data-app-id=relay] .drawer-close{display:block;align-self:flex-end;margin-bottom:10px}
  :root[data-app-id=relay] .drawer-open .drawer-backdrop{display:block;position:fixed;inset:0;z-index:19;background:rgba(13,17,23,.55);width:100%;height:100dvh}
  :root[data-app-id=relay] .sidebar{z-index:20}
  .release-toolbar{display:block}.release-toolbar label{margin-bottom:12px}
@@ -107,3 +106,54 @@
 
 :root[data-app-id] .composer-inner,:root[data-app-id] .attachment-tag{background:var(--surface-solid);color:var(--text);border-color:var(--border)}
 :root[data-app-id] .attachments,:root[data-app-id] .file-icon,:root[data-app-id] .image-placeholder{background:var(--accent-soft);color:var(--accent);border-color:var(--border)}
+
+/* Relay: compact search, neutral legacy text, and no redundant drawer close control. */
+:root[data-app-id=relay] .sidebar-note p,
+:root[data-app-id=relay] .sidebar-label,
+:root[data-app-id=relay] .message-meta strong,
+:root[data-app-id=relay] .message-meta time,
+:root[data-app-id=relay] .sync-state{color:var(--muted)}
+:root[data-app-id=relay] .note-dot,
+:root[data-app-id=relay] .sync-state i{background:var(--accent)}
+.search-dialog{width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px;border:1px solid var(--border);border-radius:13px;background:var(--surface-solid);color:var(--text);box-shadow:var(--shadow)}
+.search-dialog::backdrop{background:rgba(13,17,23,.55)}
+.search-dialog-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.search-dialog-heading h2{font-size:18px;margin:0}
+.search-dialog .search-bar{margin:0;padding:0;border:0;box-shadow:none;gap:16px}
+.search-dialog .search-bar label{width:100%;min-width:0}
+.search-dialog .icon-button,#open-search{min-width:44px;min-height:44px}
+@media(max-width:700px){
+ :root[data-app-id=relay] .topbar-actions{gap:6px}
+ :root[data-app-id=relay] .sync-state>span{display:none}
+ .search-dialog{padding:20px;max-height:calc(100dvh - 24px)}
+}
+
+/* Relay refinement: restrained message actions and a roomier editor. */
+:root[data-app-id=relay] .message-actions button,
+:root[data-app-id=relay] .message-actions a{background:transparent;box-shadow:none;border:0;color:var(--muted)}
+:root[data-app-id=relay] .message-actions button:hover,
+:root[data-app-id=relay] .message-actions a:hover{background:transparent;color:var(--accent)}
+:root[data-app-id=relay] .inbox-intro-compact{display:flex;justify-content:flex-start;align-items:center;gap:10px;padding:10px 14px;margin-bottom:20px;border-radius:8px;background:var(--accent-soft)}
+:root[data-app-id=relay] .inbox-intro-compact strong{font-size:12px;line-height:1.5;font-weight:500}
+:root[data-app-id=relay] .inbox-intro-compact .intro-symbol{font-size:22px;line-height:1;color:var(--accent);transform:none}
+:root[data-app-id=relay] .composer textarea{min-height:72px;max-height:180px;padding:12px 14px 8px}
+:root[data-app-id=relay] .sidebar{overflow-y:auto}
+:root[data-app-id=relay] .sidebar-tools{display:flex;align-items:center;gap:8px;margin-top:16px;padding:8px 0;border-top:1px solid var(--border)}
+:root[data-app-id=relay] .sidebar-tools button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 10px;background:transparent;color:var(--muted);font-size:13px;border-radius:7px}
+:root[data-app-id=relay] .sidebar-tools button:hover{background:var(--accent-soft);color:var(--accent)}
+:root[data-app-id=relay] .sidebar-appearance{flex:1}
+:root[data-app-id=relay] .sidebar-language{min-width:44px;border:1px solid var(--border)}
+@media(max-width:700px){
+ :root[data-app-id=relay] .inbox-intro-compact{padding:8px 12px;margin-bottom:14px;gap:8px}
+ :root[data-app-id=relay] .composer textarea{min-height:64px;max-height:144px;padding:10px 12px 6px}
+}
+
+/* Keep the chat canvas continuous behind the editor; only the writing surface is a card. */
+:root[data-app-id=relay] .composer{background:var(--bg)}
+:root[data-app-id=relay] .composer-inner{background:var(--surface-solid);box-shadow:none;border-color:var(--border)}
+:root[data-app-id=relay] .composer textarea{background:transparent}
+:root[data-app-id=relay] .composer-tools .retention select,
+:root[data-app-id=relay] .private-message,
+:root[data-app-id=relay] .image-thumb{background:transparent}
+.session-loading{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;color:var(--muted);background:var(--bg)}
+.session-loading p{margin:0}

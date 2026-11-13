@@ -65,12 +65,12 @@ func (a *app) listMessages(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "开始时间必须早于结束时间")
 		return
 	}
+	a.mu.Lock()
+	s := a.sessions[strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")]
+	a.mu.Unlock()
 	switch q.Get("scope") {
 	case "", "all":
 	case "current":
-		a.mu.Lock()
-		s := a.sessions[strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")]
-		a.mu.Unlock()
 		if s.Started.IsZero() {
 			fail(w, 401, "请重新验证")
 			return
@@ -121,11 +121,20 @@ func (a *app) listMessages(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, "读取隐私状态失败")
 		return
 	}
+	// Independent of search, file filtering and pagination: badge counts only this session.
+	var currentCount int64
+	if !s.Started.IsZero() {
+		e = tx.QueryRow(`SELECT COUNT(*) FROM messages WHERE user_id=? AND created>=? AND (expires=0 OR expires>?)`, u.ID, s.Started.UnixMilli(), now()).Scan(&currentCount)
+		if e != nil {
+			fail(w, 500, "读取消息数量失败")
+			return
+		}
+	}
 	if e = tx.Commit(); e != nil {
 		fail(w, 500, "读取消息失败")
 		return
 	}
-	payload, e := json.Marshal(map[string]any{"messages": out, "has_more": hasMore, "auto_load_images": config.AutoLoadImages, "message_size": config.MessageSize, "privacy_revision": privacyRevision, "user": u, "device_template": config.DeviceTemplate, "max_file_mb": config.MaxMB})
+	payload, e := json.Marshal(map[string]any{"messages": out, "current_count": currentCount, "has_more": hasMore, "auto_load_images": config.AutoLoadImages, "message_size": config.MessageSize, "privacy_revision": privacyRevision, "user": u, "device_template": config.DeviceTemplate, "max_file_mb": config.MaxMB})
 	if e != nil {
 		fail(w, 500, "读取消息失败")
 		return

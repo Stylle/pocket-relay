@@ -675,6 +675,7 @@
  "请确认清空缩略图与压缩图": "Confirm clearing thumbnails and compressed images",
  "界面与语言": "Appearance & language",
  "外观设置": "Appearance",
+ "文件信息": "File information",
  "配色": "Palette",
  "语言": "Language",
  "关闭": "Close",
