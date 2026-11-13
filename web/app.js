@@ -153,6 +153,9 @@ function authMode(mode) {
   $("code").value = "";
   $("auth-error").textContent = "";
   const register = mode === "register";
+  const accountHint = register ? "给你的账户起个名字" : "输入账户名称";
+  $("account").placeholder = tr(accountHint);
+  window.AppI18n?.bind($("account"), accountHint, "placeholder");
   uiText($("auth-title"),register
     ? state.status.setup
       ? tr("创建你的私人空间")
@@ -1492,17 +1495,26 @@ $("backup").onclick = () =>
       throw e;
     }
   });
-$("restore-file").onchange = async () => {
-  const file = $("restore-file").files[0];
-  $("restore-file").value = "";
-  if (!file) return;
+let selectedBackup = null, restoreBusy = false;
+$("restore-choose").onclick = () => $("restore-file").click();
+$("restore-confirm").onchange = () => { $("restore-start").disabled = !selectedBackup || !$("restore-confirm").checked || restoreBusy; };
+$("restore-file").onchange = () => {
+ selectedBackup = $("restore-file").files[0] || null; $("restore-file").value = "";
+ $("restore-confirm").checked = false; $("restore-start").disabled = true;
+ const label = $("restore-name");
+ label.removeAttribute("data-i18n");label.removeAttribute("data-ui-key");
+ label.textContent = selectedBackup ? selectedBackup.name + " · " + size(selectedBackup.size) : tr("尚未选择备份包");
+ label.title = selectedBackup?.name || "";
+};
+$("restore-start").onclick = async () => {
+  const file = selectedBackup;
+  if (!file || !$("restore-confirm").checked || restoreBusy) return;
   const password = $("backup-password").value;
   if (password.length < 12) {
     toast(tr("请先填写此备份的密码"), true);
     return;
   }
-  if (!confirm(tr("恢复将替换所有账户、设置和本地文件，并重启服务。确认恢复？")))
-    return;
+  restoreBusy = true; $("restore-start").disabled = true; $("restore-choose").disabled = true; $("backup").disabled = true;
   $("backup-progress").textContent = tr("正在上传并验证备份，请勿关闭页面…");
   try {
     const result = await json("/api/admin/restore", {
@@ -1520,7 +1532,7 @@ $("restore-file").onchange = async () => {
   } catch (e) {
     $("backup-progress").textContent = tr("恢复未完成，原有数据未替换。");
     toast(e.message, true);
-  }
+  } finally { restoreBusy = false; $("restore-choose").disabled = false; $("backup").disabled = false; $("restore-start").disabled = !selectedBackup || !$("restore-confirm").checked; }
 };
 
 function expireSession(

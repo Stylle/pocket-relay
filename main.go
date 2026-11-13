@@ -28,7 +28,7 @@ import (
 //go:embed web/*
 var assets embed.FS
 
-const version = "0.6.0"
+const version = "0.7.0"
 
 type user struct {
 	ID      string `json:"id"`
@@ -327,6 +327,10 @@ func (a *app) handler() http.Handler {
 	})
 }
 func main() {
+	for runMain() {
+	}
+}
+func runMain() bool {
 	dir := os.Getenv("DATA_DIR")
 	if dir == "" {
 		dir = "data"
@@ -345,13 +349,16 @@ func main() {
 	defer a.db.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	go a.janitor(ctx)
 	var telegramWorkers sync.WaitGroup
+	telegramWorkers.Add(1)
+	go func() { defer telegramWorkers.Done(); a.janitor(ctx) }()
 	telegramWorkers.Add(1)
 	go func() { defer telegramWorkers.Done(); a.runTelegram(ctx) }()
 	defer func() { stop(); telegramWorkers.Wait() }()
+	shutdownDone := make(chan struct{})
 	server := &http.Server{Addr: address, Handler: a.handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}
 	go func() {
+		defer close(shutdownDone)
 		select {
 		case <-ctx.Done():
 		case <-a.restart:
@@ -359,7 +366,12 @@ func main() {
 		}
 		c, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		server.Shutdown(c)
+		select {
+		case <-a.restart:
+			_ = server.Shutdown(context.Background())
+		default:
+			_ = server.Shutdown(c)
+		}
 	}()
 	urlAddress := address
 	if strings.HasPrefix(urlAddress, ":") {
@@ -368,5 +380,13 @@ func main() {
 	log.Printf("Pocket Relay 已启动：http://%s；首次初始化请在可信网络完成。", urlAddress)
 	if e = server.ListenAndServe(); e != nil && !errors.Is(e, http.ErrServerClosed) {
 		log.Fatal(e)
+	}
+
+	<-shutdownDone
+	select {
+	case <-a.restart:
+		return true
+	default:
+		return false
 	}
 }

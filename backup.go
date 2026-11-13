@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/pbkdf2"
@@ -177,6 +178,9 @@ func (a *app) exportBackup(w http.ResponseWriter, r *http.Request) {
 	copyDB, copyErr := sql.Open("sqlite", snapshot)
 	if copyErr == nil {
 		_, copyErr = copyDB.Exec(`DELETE FROM remembered_sessions`)
+		if copyErr == nil {
+			_, copyErr = copyDB.Exec(`UPDATE files SET store_id='local' WHERE deleted=0`)
+		}
 		if closeErr := copyDB.Close(); copyErr == nil {
 			copyErr = closeErr
 		}
@@ -195,30 +199,46 @@ func (a *app) exportBackup(w http.ResponseWriter, r *http.Request) {
 	if e = zipAdd(z, "app.db", snapshot); e == nil {
 		e = zipAdd(z, "master.key", filepath.Join(a.dir, "master.key"))
 	}
+
 	if e == nil {
+		type attachment struct {
+			id, storeID, digest string
+			size                int64
+		}
+		var files []attachment
 		var rows *sql.Rows
-		rows, e = a.db.Query(`SELECT id FROM files WHERE store_id='local' AND deleted=0`)
+		rows, e = a.db.Query(`SELECT id,store_id,size,sha256 FROM files WHERE deleted=0`)
 		if e == nil {
 			for rows.Next() {
-				var id string
-				if e = rows.Scan(&id); e != nil {
+				var item attachment
+				if e = rows.Scan(&item.id, &item.storeID, &item.size, &item.digest); e != nil {
 					break
 				}
-				if e = zipAdd(z, "blobs/"+id, filepath.Join(a.dir, "blobs", id)); e != nil {
-					break
-				}
+				files = append(files, item)
 			}
-			if rows.Err() != nil {
+			if e == nil {
 				e = rows.Err()
 			}
 			rows.Close()
 		}
+		if e == nil {
+			for _, item := range files {
+				if e = a.backupAttachment(r.Context(), z, dir, item.id, item.storeID, item.size, item.digest); e != nil {
+					break
+				}
+			}
+		}
 	}
+
 	if closeErr := z.Close(); e == nil {
 		e = closeErr
 	}
 	if e != nil {
-		fail(w, 500, "备份失败，部分本地文件缺失或磁盘空间不足")
+		fail(w, 500, "备份失败，附件缺失、远程存储不可访问、校验失败或磁盘空间不足")
+		return
+	}
+	if info, err := f.Stat(); err != nil || info.Size() > backupLimit {
+		fail(w, 400, "完整备份超过 20 GB，请改用停服复制完整 data 目录的方式")
 		return
 	}
 	if _, e = f.Seek(0, io.SeekStart); e != nil {
@@ -483,4 +503,43 @@ func applyRestore(dir string) error {
 	}
 	_ = os.Remove(filepath.Join(dir, stage))
 	return nil
+}
+
+// Materialize remote attachments inside the portable archive, never into the live store.
+func (a *app) backupAttachment(ctx context.Context, z *zip.Writer, stage, id, storeID string, size int64, digest string) error {
+	if !objectID.MatchString(id) || size < 0 || size > backupLimit {
+		return errors.New("invalid attachment")
+	}
+	source := filepath.Join(a.dir, "blobs", id)
+	if storeID != "local" {
+		st, e := a.getStore(storeID)
+		if e != nil {
+			return e
+		}
+		f, e := os.CreateTemp(stage, "remote-")
+		if e != nil {
+			return e
+		}
+		source = f.Name()
+		defer os.Remove(source)
+		e = a.fetch(ctx, st, id, f, size)
+		closeErr := f.Close()
+		if e != nil {
+			return e
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+	}
+	f, e := os.Open(source)
+	if e != nil {
+		return e
+	}
+	h := sha256.New()
+	n, e := io.Copy(h, io.LimitReader(f, size+1))
+	f.Close()
+	if e != nil || n != size || fmt.Sprintf("%x", h.Sum(nil)) != digest {
+		return errors.New("attachment integrity mismatch")
+	}
+	return zipAdd(z, "blobs/"+id, source)
 }

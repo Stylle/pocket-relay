@@ -18,3 +18,33 @@
 .workspace .topbar .appearance-controls{margin:0}
 .workspace .topbar .theme-switch{display:flex;align-items:center}
 @media(max-width:700px){.workspace .topbar{height:68px;padding:12px 16px}.workspace .topbar h1{font-size:16px}.workspace .topbar-actions{gap:4px}.workspace .sync-state{display:none}.workspace .topbar .theme-switch button{min-width:30px;width:30px;min-height:34px;padding:4px}}
+
+/* On phones and tablets, keep the same compact login hierarchy as the other apps. */
+@media(max-width:1000px){
+ :root[data-app-id="relay"] .auth-layout{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100dvh;padding:88px 20px 28px;gap:20px}
+ :root[data-app-id="relay"] .auth-layout>.auth-story{display:block;position:absolute;top:24px;left:20px;width:auto;max-width:none;padding:0;background:transparent}
+ :root[data-app-id="relay"] .auth-story .story-body,:root[data-app-id="relay"] .auth-story footer{display:none}
+ :root[data-app-id="relay"] .auth-story .brand{font-size:18px;justify-content:flex-start;gap:8px}
+ :root[data-app-id="relay"] .auth-story .brand-icon{width:28px;height:28px;font-size:22px;border-radius:8px}
+ :root[data-app-id="relay"] .auth-story .brand small{display:none}
+ :root[data-app-id="relay"] .auth-layout>.auth-panel{width:100%;max-width:430px;padding:24px 20px;border:1px solid var(--border);border-radius:10px;background:var(--surface-solid)}
+ :root[data-app-id="relay"] .auth-box{width:100%;max-width:none}
+ :root[data-app-id="relay"] .auth-layout .auth-box>.appearance-controls{position:fixed;top:14px;right:16px;left:auto;z-index:20}
+ :root[data-app-id="relay"] .auth-box>.pill{display:none}
+ :root[data-app-id="relay"] .auth-box h2{font-size:25px;line-height:1.35;margin-bottom:10px}
+}
+
+:root[data-app-id="relay"] .backup-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0;margin:18px 0}
+:root[data-app-id="relay"] :is(.backup-pick,.backup-restore){display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:10px 16px;border-radius:8px;font:inherit;font-size:14px;cursor:pointer;background:var(--surface-solid);color:var(--text);border:1px solid var(--border)}
+:root[data-app-id="relay"] .backup-restore{border-color:var(--err);color:var(--err);background:transparent}
+:root[data-app-id="relay"] .backup-pick:hover:not(:disabled){background:var(--accent-soft)}
+:root[data-app-id="relay"] .backup-file-name{flex:1;min-width:0;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:root[data-app-id="relay"] .backup-confirm{align-items:flex-start;font-size:13px;line-height:1.7;gap:10px}
+:root[data-app-id="relay"] .backup-confirm input{margin-top:4px}
+@media(max-width:600px){:root[data-app-id="relay"] .backup-file-name{flex-basis:100%}:root[data-app-id="relay"] .backup-restore{width:100%}}
+
+/* Remembering a session is a secondary form option, not a heading. */
+:root[data-app-id="relay"] #auth-form label.check{font-size:13px;font-weight:400;line-height:1.5;color:var(--muted);gap:8px;min-height:36px;padding:4px 0;margin:0}
+:root[data-app-id="relay"] #auth-form label.check span{font-weight:400}
+:root[data-app-id="relay"] #auth-form label.check+p{font-size:12px;line-height:1.65;margin:4px 0 16px}
+:root[data-app-id="relay"] #auth-error:empty{min-height:0;margin:0}

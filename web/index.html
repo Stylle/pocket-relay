@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN" data-app-id="relay" data-app-name="随手传" data-app-version="0.6.0" data-app-copyright="© 2026 Stylle" data-app-description="用于多设备同步文字、图片与文件，支持私有存储、Telegram 和加密备份。" data-default-theme="system">
+<html lang="zh-CN" data-app-id="relay" data-app-name="随手传" data-app-version="0.7.0" data-app-copyright="© 2026 Stylle" data-app-description="用于多设备同步文字、图片与文件，支持私有存储、Telegram 和加密备份。" data-default-theme="system">
   <head>
     <meta charset="utf-8" />
     <meta
@@ -461,8 +461,8 @@
           </div>
           <div class="settings-card">
             <h3 data-i18n="加密备份与恢复">加密备份与恢复</h3>
-            <p data-i18n="包含账户、验证器密钥、所有设置、本地附件。远程存储仅备份连接配置和文件索引，不复制远程文件。" class="muted">
-              包含账户、验证器密钥、所有设置、本地附件。远程存储仅备份连接配置和文件索引，不复制远程文件。
+            <p data-i18n="包含账户、验证器密钥、所有设置和全部附件（包括 WebDAV/SMB）。恢复后附件保存在本地，原存储连接配置保留；远程附件不可读取时备份会失败。" class="muted">
+              包含账户、验证器密钥、所有设置和全部附件（包括 WebDAV/SMB）。恢复后附件保存在本地，原存储连接配置保留；远程附件不可读取时备份会失败。
             </p>
             <label
               ><span data-i18n="备份密码（至少 12 个字符）">备份密码（至少 12 个字符）</span><input
@@ -472,17 +472,15 @@
                 minlength="12"
                 placeholder="请保存密码，无法找回" data-i18n-placeholder="请保存密码，无法找回"
             /></label>
-            <div class="button-row">
-              <button data-i18n="下载加密备份" id="backup" class="primary" type="button">
-                下载加密备份</button
-              ><label class="secondary file-label"
-                ><span data-i18n="从备份恢复">从备份恢复</span><input
-                  id="restore-file"
-                  type="file"
-                  accept=".prb"
-                  hidden
-              /></label>
+            <div class="backup-actions"><button data-i18n="下载加密备份" id="backup" class="primary" type="button">下载加密备份</button></div>
+            <h4 data-i18n="从备份恢复">从备份恢复</h4>
+            <div class="backup-actions">
+              <input id="restore-file" type="file" accept=".prb" hidden />
+              <button id="restore-choose" class="backup-pick" type="button"><span aria-hidden="true">＋</span><span data-i18n="选择备份包">选择备份包</span></button>
+              <span id="restore-name" class="backup-file-name" data-i18n="尚未选择备份包">尚未选择备份包</span>
             </div>
+            <label class="check backup-confirm"><input id="restore-confirm" type="checkbox" /><span data-i18n="我已备份当前数据，确认用备份包替换。">我已备份当前数据，确认用备份包替换。</span></label>
+            <button id="restore-start" class="backup-restore" type="button" disabled data-i18n="校验并导入备份">校验并导入备份</button>
             <p data-i18n="恢复会替换整个站点数据并重启容器；现有 data 会保留在 previous-* 目录供人工恢复。首次初始化请在可信网络完成，不要把未初始化站点暴露公网。" class="warning">
               恢复会替换整个站点数据并重启容器；现有 data 会保留在 previous-*
               目录供人工恢复。首次初始化请在可信网络完成，不要把未初始化站点暴露公网。

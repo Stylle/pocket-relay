@@ -173,3 +173,7 @@
 :root[data-app-id] :is(button,a,input,select,textarea):focus-visible{outline:2px solid var(--accent);outline-offset:3px;box-shadow:none}
 :root[data-app-id] input[type=radio]{width:18px;height:18px;min-height:18px;max-height:18px;padding:0;flex:0 0 18px;border-radius:50%}
 @media(forced-colors:active){:root[data-app-id] input[type=checkbox]{appearance:auto;-webkit-appearance:auto}:root[data-app-id] input[type=checkbox]::before{display:none}}
+
+/* Chat content follows the active palette, including long messages and links. */
+:root[data-app-id="relay"] .message-text{color:var(--text)}
+:root[data-app-id="relay"] .message-link{color:var(--accent-2)}
