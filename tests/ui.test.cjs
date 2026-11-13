@@ -30,6 +30,7 @@ function fixture(
     remembered = false,
     revealText = "revealed test body",
     messageSize = "medium",
+    language = false,
   } = {},
 ) {
   const dom = new JSDOM(html, {
@@ -167,6 +168,7 @@ function fixture(
       headers: { "content-type": "application/json" },
     });
   };
+  if(language)w.eval(fs.readFileSync("web/ui-i18n.js", "utf8"));
   w.eval(fs.readFileSync("web/session.js", "utf8"));
   w.eval(fs.readFileSync("web/message-text.js", "utf8"));
   w.eval(
@@ -802,4 +804,31 @@ test("late thumbnail and original requests cannot load or reopen after context c
   await settle();
   assert.equal(f.$("image-viewer").hidden, true);
   assert.equal(f.$("image-viewer-image").getAttribute("src"), null);
+});
+
+test("language switch preserves draft, session and user content without business requests", async t => {
+ const f=fixture(t,{language:true});await settle();await login(f);
+ f.$("message-text").value="保存设置 <script>never execute</script>";
+ const userContent=f.w.document.createElement("p");userContent.className="message-text";userContent.textContent="本次消息 设为隐私";f.$("timeline").append(userContent);
+ const before=f.calls.length,session=f.w.__test.browserSession;
+ f.w.AppI18n.set("en");await settle();
+ assert.equal(f.$("message-text").value,"保存设置 <script>never execute</script>");
+ assert.equal(userContent.textContent,"本次消息 设为隐私");
+ assert.equal(f.w.__test.browserSession,session);
+ assert.equal(f.calls.length,before);
+ assert.match(f.w.document.querySelector('[data-view="all"]').textContent,/All messages/);
+ f.w.AppI18n.set("zh");assert.equal(userContent.textContent,"本次消息 设为隐私");
+});
+
+test("drawer waits for paint before focusing and returns focus on close",async t=>{
+ const f=fixture(t);await settle();await login(f);
+ const frames=[];f.w.requestAnimationFrame=fn=>{frames.push(fn);return frames.length};
+ f.w.eval(fs.readFileSync("web/appearance.js","utf8"));
+ const trigger=f.$("mobile-menu"),close=f.w.document.querySelector('#relay-nav [data-drawer-close]');
+ for(const el of f.w.document.querySelectorAll('#relay-nav button'))el.getClientRects=()=>[{width:44,height:44}];
+ trigger.click();assert.notEqual(f.w.document.activeElement,close);
+ while(frames.length)frames.shift()();
+ assert.equal(f.w.document.activeElement,close);
+ close.click();assert.equal(f.w.document.activeElement,trigger);
+ assert.equal(f.$("workspace").classList.contains("drawer-open"),false);
 });

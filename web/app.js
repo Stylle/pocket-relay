@@ -1,3 +1,6 @@
+function uiText(el,key){if(window.AppI18n)window.AppI18n.bind(el,key);else el.textContent=key}
+const tr = text => window.AppI18n ? window.AppI18n.t(text) : text;
+function uiNode(tag,cls,key){const el=node(tag,cls,key);if(window.AppI18n)window.AppI18n.bind(el,key);return el}
 "use strict";
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -65,6 +68,7 @@ function node(tag, cls, text) {
 }
 function button(text, action, cls = "") {
   const b = node("button", cls, text);
+  if(window.AppI18n)window.AppI18n.bind(b,text);
   b.type = "button";
   b.addEventListener("click", () =>
     Promise.resolve(action()).catch((e) => toast(e.message, true)),
@@ -121,7 +125,7 @@ async function api(path, options = {}) {
     const b = await res.json().catch(() => ({}));
     if (res.status === 401 && state.token) {
       logoutLocal();
-      toast(b.error || "请重新验证", true);
+      toast(b.error || tr("请重新验证"), true);
     }
     throw Error(b.error || "请求失败，请检查网络（" + res.status + "）");
   }
@@ -150,29 +154,29 @@ function authMode(mode) {
   $("code").value = "";
   $("auth-error").textContent = "";
   const register = mode === "register";
-  $("auth-title").textContent = register
+  uiText($("auth-title"),register
     ? state.status.setup
-      ? "创建你的私人空间"
-      : "创建临时空间"
-    : "欢迎回来";
-  $("auth-description").textContent = register
-    ? "先添加验证器，再用一组验证码确认绑定。"
-    : "打开验证器，输入此刻的六位验证码。";
+      ? tr("创建你的私人空间")
+      : tr("创建临时空间")
+    : tr("欢迎回来"));
+  uiText($("auth-description"),register
+    ? tr("先添加验证器，再用一组验证码确认绑定。")
+    : tr("打开验证器，输入此刻的六位验证码。"));
   $("code-label").hidden = register;
   $("code").required = !register;
-  $("auth-submit").textContent = register
-    ? "生成验证器二维码 →"
-    : "进入我的空间 →";
+  uiText($("auth-submit"),register
+    ? tr("生成验证器二维码 →")
+    : tr("进入我的空间 →"));
   $("auth-switch").hidden =
     state.status.setup || !state.status.public_registration;
-  $("auth-switch").textContent = register
-    ? "已有账户？返回登录"
-    : "还没有账户？创建临时空间";
+  uiText($("auth-switch"),register
+    ? tr("已有账户？返回登录")
+    : tr("还没有账户？创建临时空间"));
   $("guest-notice").textContent =
     register && !state.status.setup
-      ? "此账户自完成注册起有效 " +
+      ? tr("此账户自完成注册起有效 ") +
         state.status.guest_hours +
-        " 小时，每个账户的数据独立。"
+        tr(" 小时，每个账户的数据独立。")
       : "";
 }
 async function enterWorkspace(result) {
@@ -188,12 +192,12 @@ async function enterWorkspace(result) {
   $("workspace").hidden = false;
   $("account-name").textContent = result.user.name;
   $("account-avatar").textContent = result.user.name.slice(0, 1);
-  $("account-role").textContent = result.user.admin
-    ? "永久管理员"
-    : "有效至 " + date(result.user.expires * 1000);
+  uiText($("account-role"),result.user.admin
+    ? tr("永久管理员")
+    : tr("有效至 ") + date(result.user.expires * 1000));
   $("admin-nav").hidden = !result.user.admin;
   $("device-name").value = device();
-  $("sending-device").textContent = "来自 " + device();
+  $("sending-device").textContent = tr("来自 ") + device();
   await setView("messages");
 }
 async function boot() {
@@ -209,7 +213,7 @@ async function boot() {
         return;
       } catch (e) {
         if (state.token) {
-          $("auth-error").textContent = "连接服务失败，请刷新重试。";
+          $("auth-error").textContent = tr("连接服务失败，请刷新重试。");
           return;
         }
       }
@@ -223,7 +227,7 @@ async function boot() {
     }
     authMode(state.status.setup ? "register" : "login");
   } catch (e) {
-    $("auth-error").textContent = "连接服务失败，请刷新重试。";
+    $("auth-error").textContent = tr("连接服务失败，请刷新重试。");
   }
 }
 $("auth-switch").onclick = () =>
@@ -248,7 +252,7 @@ $("auth-form").onsubmit = async (e) => {
       $("code-label").hidden = false;
       $("code").required = true;
       $("account").readOnly = true;
-      $("auth-submit").textContent = "确认绑定并进入 →";
+      uiText($("auth-submit"),tr("确认绑定并进入 →"));
       $("code").focus();
       return;
     }
@@ -309,7 +313,7 @@ $("logout").onclick = async () => {
     await json("/api/logout", { method: "POST" });
     logoutLocal();
   } catch (_) {
-    toast("退出未完成，请恢复网络后重试，避免记住状态仍然有效。", true);
+    toast(tr("退出未完成，请恢复网络后重试，避免记住状态仍然有效。"), true);
   }
 };
 document
@@ -332,23 +336,22 @@ async function setView(view) {
   $("search-custom").hidden = true;
   $("search-from").required = false;
   $("search-to").required = false;
-  $("search-status").textContent =
-    view === "messages"
-      ? "历史已折叠；搜索默认覆盖全部记录。"
-      : "搜索默认覆盖全部文字记录。";
+  uiText($("search-status"),view === "messages"
+      ? tr("历史已折叠；搜索默认覆盖全部记录。")
+      : tr("搜索默认覆盖全部文字记录。"));
   state.view = view;
   $("search-form").hidden = view !== "all";
   $("workspace").classList.remove("menu-open", "drawer-open");
   document
     .querySelectorAll("[data-view]")
     .forEach((b) => b.classList.toggle("active", b.dataset.view === view));
-  $("view-title").textContent = {
-    messages: "本次消息",
-    all: "全部信息",
-    files: "文件与影像",
-    settings: "设备设置",
-    admin: "管理后台",
-  }[view];
+  uiText($("view-title"),{
+    messages: tr("本次消息"),
+    all: tr("全部信息"),
+    files: tr("文件与影像"),
+    settings: tr("设备设置"),
+    admin: tr("管理后台"),
+  }[view]);
   $("messages-view").hidden = !["messages", "all", "files"].includes(view);
   $("settings-view").hidden = view !== "settings";
   $("admin-view").hidden = view !== "admin";
@@ -363,8 +366,8 @@ async function setView(view) {
 $("device-form").onsubmit = (e) => {
   e.preventDefault();
   save("pr-device", $("device-name").value.trim());
-  $("sending-device").textContent = "来自 " + device();
-  toast("设备名称已保存");
+  $("sending-device").textContent = tr("来自 ") + device();
+  toast(tr("设备名称已保存"));
 };
 async function ticket(id) {
   return (await json("/api/files/" + id + "/ticket", { method: "POST" })).url;
@@ -391,7 +394,7 @@ async function copyText(text) {
     t.remove();
     if (!ok) throw Error("当前浏览器不允许复制，请使用 HTTPS 或手动选择文字");
   }
-  toast("已复制");
+  toast(tr("已复制"));
 }
 async function copyImage(m) {
   if (
@@ -426,7 +429,7 @@ async function copyImage(m) {
   })();
   await navigator.clipboard.write([new ClipboardItem({ "image/png": task })]);
   toast(
-    m.mime === "image/gif" ? "已复制静态首帧，保留动图请下载" : "图片已复制",
+    m.mime === "image/gif" ? tr("已复制静态首帧，保留动图请下载") : tr("图片已复制"),
   );
 }
 function isImage(m) {
@@ -458,7 +461,7 @@ function renderText(text) {
           )
         )
           toast(
-            "若无法打开，请在右上角选择“在浏览器中打开”，或复制链接到浏览器。",
+            tr("若无法打开，请在右上角选择“在浏览器中打开”，或复制链接到浏览器。"),
           );
       };
     } else
@@ -522,7 +525,7 @@ async function revealMessage(m) {
     if ((result.privacy_version ?? 0) !== (m.privacy_version ?? 0)) {
       state.signature = "";
       await refresh();
-      toast("隐私状态已更新，请重新点击。");
+      toast(tr("隐私状态已更新，请重新点击。"));
       return;
     }
     state.revealed.set(m.id, {
@@ -545,7 +548,7 @@ function privatePlaceholder(m) {
     ),
   );
   b.append(
-    node("small", "message-filename", m.file_id ? m.name : "点击查看完整消息"),
+    node("small", "message-filename", m.file_id ? m.name : tr("点击查看完整消息")),
   );
   return b;
 }
@@ -578,7 +581,7 @@ async function togglePrivacy(m) {
   closeOriginal();
   renderMessages();
   await refresh();
-  toast(concealed ? "已设为隐私；已送达 TG 的副本不会撤回" : "已取消隐私");
+  toast(concealed ? tr("已设为隐私；已送达 TG 的副本不会撤回") : tr("已取消隐私"));
 }
 async function loadPreview(element, m, attempt = 0) {
   const token = state.token,
@@ -600,7 +603,7 @@ async function loadPreview(element, m, attempt = 0) {
       );
     } else if (element.isConnected && current())
       element.replaceWith(
-        node("p", "muted small", "预览暂不可用或格式不受支持，请尝试下载。"),
+        uiNode("p", "muted small", "预览暂不可用或格式不受支持，请尝试下载。"),
       );
   };
   element.onerror = retry;
@@ -626,22 +629,22 @@ function renderMessages() {
     const empty = node("div", "empty");
     empty.append(
       node("span", "", "↗"),
-      node(
+      uiNode(
         "h2",
         "",
         state.view === "files"
-          ? "这里，留给值得带走的文件。"
-          : "第一条，留给自己。",
+          ? tr("这里，留给值得带走的文件。")
+          : tr("第一条，留给自己。"),
       ),
-      node("p", "", "粘贴文字、拖入文件，换个设备接着看。"),
+      uiNode("p", "", "粘贴文字、拖入文件，换个设备接着看。"),
     );
     if (state.view === "messages") {
       empty.append(
-        node("p", "muted", "历史记录已折叠，本页只显示本次登录后发送的消息。"),
-        button("查看全部信息", () => setView("all"), "secondary"),
+        uiNode("p", "muted", "历史记录已折叠，本页只显示本次登录后发送的消息。"),
+        button(tr("查看全部信息"), () => setView("all"), "secondary"),
       );
     } else if (state.filters) {
-      empty.replaceChildren(node("h2", "", "没有找到符合条件的消息。"));
+      empty.replaceChildren(uiNode("h2", "", "没有找到符合条件的消息。"));
     }
     fragment.append(empty);
   }
@@ -660,7 +663,7 @@ function renderMessages() {
     );
     if (m.expires)
       meta.append(
-        node("span", "expiry-badge", date(m.expires * 1000) + " 过期"),
+        node("span", "expiry-badge", date(m.expires * 1000) + tr(" 过期")),
       );
     const bubble = node("div", "bubble");
     if (
@@ -723,7 +726,7 @@ function renderMessages() {
             "",
             size(m.size) +
               " · " +
-              (m.name.split(".").pop() || "文件").toUpperCase(),
+              (m.name.split(".").pop() || tr("文件")).toUpperCase(),
           ),
         );
         card.append(node("span", "file-icon", "▤"), info);
@@ -733,30 +736,30 @@ function renderMessages() {
     const text = m.concealed ? state.revealed.get(m.id)?.text : m.text;
     if (!hidden && text) bubble.append(renderText(text));
     const actions = node("div", "message-actions");
-    if (text) actions.append(button("复制文字", () => copyText(text)));
+    if (text) actions.append(button(tr("复制文字"), () => copyText(text)));
     actions.append(
-      button(m.concealed ? "取消隐私" : "设为隐私", () => togglePrivacy(m)),
+      button(m.concealed ? tr("取消隐私") : tr("设为隐私"), () => togglePrivacy(m)),
     );
     if (m.concealed && state.revealed.has(m.id))
       actions.append(
-        button("收起", () => {
+        button(tr("收起"), () => {
           state.revealed.delete(m.id);
           renderMessages();
         }),
       );
     if (m.file_id) {
       if (isImage(m) && !hidden)
-        actions.append(button("复制图片", () => copyImage(m)));
-      actions.append(button("下载 · " + size(m.size), () => download(m)));
+        actions.append(button(tr("复制图片"), () => copyImage(m)));
+      actions.append(button(tr("下载 · ") + size(m.size), () => download(m)));
     }
     actions.append(
-      button("删除", async () => {
-        if (!confirm("删除这条消息及附件？此操作无法撤销。")) return;
+      button(tr("删除"), async () => {
+        if (!confirm(tr("删除这条消息及附件？此操作无法撤销。"))) return;
         await json("/api/messages/" + m.id, { method: "DELETE" });
         state.older = state.older.filter((x) => x.id !== m.id);
         state.signature = "";
         await refresh();
-        toast("已删除");
+        toast(tr("已删除"));
       }),
     );
     content.append(meta, bubble, actions);
@@ -794,7 +797,7 @@ $("search-form").onsubmit = async (event) => {
         ? new Date($("search-to").value).getTime()
         : Date.now() + 1;
     if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to) {
-      toast("请选择有效的起止时间", true);
+      toast(tr("请选择有效的起止时间"), true);
       return;
     }
     query.set("from", from);
@@ -813,9 +816,8 @@ $("search-form").onsubmit = async (event) => {
   state.hasMore = false;
   state.signature = "";
   renderMessages();
-  $("view-title").textContent = "搜索结果 · 全部记录";
-  $("search-status").textContent =
-    "搜索范围：此账户的全部记录（含已折叠历史）。";
+  uiText($("view-title"),tr("搜索结果 · 全部记录"));
+  uiText($("search-status"),tr("搜索范围：此账户的全部记录（含已折叠历史）。"));
   await refresh();
 };
 function messageQuery() {
@@ -840,7 +842,7 @@ async function refresh() {
     if (generation !== state.generation) return;
     if (response.status === 304) {
       $("sync-state").classList.remove("offline");
-      $("sync-state").lastChild.textContent = "已同步";
+      $("sync-state").lastChild.textContent = tr("已同步");
       return;
     }
     state.etag = response.headers.get("ETag") || "";
@@ -888,11 +890,11 @@ async function refresh() {
       renderMessages();
     }
     $("sync-state").classList.remove("offline");
-    $("sync-state").lastChild.textContent = "已同步";
+    $("sync-state").lastChild.textContent = tr("已同步");
   } catch (e) {
     if (generation !== state.generation || !state.token) return;
     $("sync-state").classList.add("offline");
-    $("sync-state").lastChild.textContent = "连接中断";
+    $("sync-state").lastChild.textContent = tr("连接中断");
   } finally {
     if (generation === state.generation) state.polling = false;
   }
@@ -912,7 +914,7 @@ $("load-older").onclick = async () =>
     if (generation !== state.generation) return;
     state.hasMore = !!result.has_more;
     if (!result.messages.length) {
-      toast("已经到底啦");
+      toast(tr("已经到底啦"));
       $("load-older").hidden = true;
       return;
     }
@@ -949,16 +951,16 @@ function renderAttachments() {
 }
 function addFiles(files) {
   if (state.busy) {
-    toast("文件正在发送，请稍后添加", true);
+    toast(tr("文件正在发送，请稍后添加"), true);
     return;
   }
   for (const f of files) {
     if (f.size > state.maxMB * 1024 ** 2) {
-      toast(f.name + " 超过 " + state.maxMB + " MB 限制", true);
+      toast(f.name + tr(" 超过 ") + state.maxMB + tr(" MB 限制"), true);
       continue;
     }
     if (state.files.length >= 30) {
-      toast("每批最多 30 个文件，请分批发送", true);
+      toast(tr("每批最多 30 个文件，请分批发送"), true);
       break;
     }
     state.files.push(f);
@@ -1029,13 +1031,13 @@ function upload(file, text, ttl, concealed) {
     xhr.open("POST", "/api/messages");
     xhr.setRequestHeader("Authorization", "Bearer " + state.token);
     xhr.upload.onprogress = (e) => {
-      $("upload-progress").textContent = e.lengthComputable
-        ? "正在上传 " +
+      uiText($("upload-progress"),e.lengthComputable
+        ? tr("正在上传 ") +
           file.name +
           " · " +
           Math.floor((e.loaded / e.total) * 100) +
           "%"
-        : "正在上传 " + file.name;
+        : tr("正在上传 ") + file.name);
     };
     xhr.onload = () => {
       let b = {};
@@ -1066,7 +1068,7 @@ async function send() {
     ttl > 365 * 86400 ||
     ($("retention").value === "custom" && ttl < 60)
   ) {
-    toast("自定义时间为 1–525600 分钟", true);
+    toast(tr("自定义时间为 1–525600 分钟"), true);
     return;
   }
   state.busy = true;
@@ -1099,7 +1101,7 @@ async function send() {
     }
     state.signature = "";
     await refresh();
-    toast("已收好，其他设备会自动同步");
+    toast(tr("已收好，其他设备会自动同步"));
   } catch (e) {
     toast(e.message, true);
   } finally {
@@ -1108,7 +1110,7 @@ async function send() {
       $(id).disabled = false;
     $("send").disabled = false;
     $("attach").disabled = false;
-    $("upload-progress").textContent = "支持任意文件 · Ctrl / ⌘ + Enter 发送";
+    uiText($("upload-progress"),tr("支持任意文件 · Ctrl / ⌘ + Enter 发送"));
   }
 }
 $("send").onclick = send;
@@ -1151,7 +1153,7 @@ async function loadTelegram() {
       "option",
       "",
       user.name +
-        (user.expires && user.expires * 1000 <= Date.now() ? "（已过期）" : ""),
+        (user.expires && user.expires * 1000 <= Date.now() ? tr("（已过期）") : ""),
     );
     option.value = user.id;
     $("tg-user").append(option);
@@ -1178,7 +1180,7 @@ $("telegram-form").onsubmit = async (event) => {
       }),
     });
     await loadTelegram();
-    toast("机器人设置已保存，已清空旧发送队列");
+    toast(tr("机器人设置已保存，已清空旧发送队列"));
   });
 };
 $("tg-test").onclick = () =>
@@ -1189,7 +1191,7 @@ $("tg-test").onclick = () =>
     });
     const chats = result.chats || [];
     $("tg-detected").replaceChildren();
-    const placeholder = node("option", "", "选择要绑定的私聊 ID");
+    const placeholder = uiNode("option", "", "选择要绑定的私聊 ID");
     placeholder.value = "";
     $("tg-detected").append(placeholder);
     for (const id of chats) {
@@ -1203,10 +1205,10 @@ $("tg-test").onclick = () =>
       $("tg-detected").value = chats[0];
     }
     $("tg-status").textContent = chats.length
-      ? "连接正常，已检测到私聊 ID；请核对后保存。"
-      : "连接正常。请在 Telegram 向 @" +
-        (result.username || "你的机器人") +
-        " 发送 /start 后重新检测。启用期间只显示已绑定 ID，修改绑定请先关闭同步。";
+      ? tr("连接正常，已检测到私聊 ID；请核对后保存。")
+      : tr("连接正常。请在 Telegram 向 @") +
+        (result.username || tr("你的机器人")) +
+        tr(" 发送 /start 后重新检测。启用期间只显示已绑定 ID，修改绑定请先关闭同步。");
   });
 $("tg-detected").onchange = () => {
   if ($("tg-detected").value) $("tg-chat").value = $("tg-detected").value;
@@ -1215,7 +1217,7 @@ $("tg-retry").onclick = () =>
   action($("tg-retry"), async () => {
     await json("/api/admin/telegram/retry", { method: "POST" });
     showTelegramStatus(await json("/api/admin/telegram"));
-    toast("已安排重试");
+    toast(tr("已安排重试"));
   });
 let telegramStatusBusy = false;
 setInterval(async () => {
@@ -1271,8 +1273,8 @@ async function loadAdmin() {
         "small",
         "",
         u.admin
-          ? "永久管理员"
-          : (u.expires * 1000 < Date.now() ? "已过期 · " : "有效至 ") +
+          ? tr("永久管理员")
+          : (u.expires * 1000 < Date.now() ? tr("已过期 · ") : tr("有效至 ")) +
               date(u.expires * 1000),
       ),
     );
@@ -1280,7 +1282,7 @@ async function loadAdmin() {
     if (!u.admin)
       row.append(
         button(
-          "延长有效期",
+          tr("延长有效期"),
           async () => {
             const hours = prompt("从现在起有效多少小时？", "1");
             if (hours === null) return;
@@ -1295,7 +1297,7 @@ async function loadAdmin() {
               body: JSON.stringify({ hours: Number(hours) }),
             });
             await loadAdmin();
-            toast("已更新有效期");
+            toast(tr("已更新有效期"));
           },
           "secondary",
         ),
@@ -1326,7 +1328,7 @@ $("admin-form").onsubmit = async (e) => {
     });
     browserSession.accept(state.token, await json("/api/session"));
     document.documentElement.dataset.messageSize = $("message-size").value;
-    toast("设置已保存");
+    toast(tr("设置已保存"));
   });
 };
 $("idle-unit").onchange = () => {
@@ -1350,7 +1352,7 @@ $("storage-test").onclick = () =>
       method: "POST",
       body: JSON.stringify(storeInput()),
     });
-    toast("读写测试通过");
+    toast(tr("读写测试通过"));
   });
 $("storage-form").onsubmit = async (e) => {
   e.preventDefault();
@@ -1361,7 +1363,7 @@ $("storage-form").onsubmit = async (e) => {
     });
     $("storage-password").value = "";
     await loadAdmin();
-    toast("存储已添加，请在上方选择并保存为新文件存储位置");
+    toast(tr("存储已添加，请在上方选择并保存为新文件存储位置"));
   });
 };
 $("backup").onclick = () =>
@@ -1387,7 +1389,7 @@ $("backup").onclick = () =>
         throw e;
       }
     }
-    $("backup-progress").textContent = "正在创建加密备份，请保持页面打开…";
+    $("backup-progress").textContent = tr("正在创建加密备份，请保持页面打开…");
     try {
       const response = await api("/api/admin/backup", {
         method: "POST",
@@ -1407,10 +1409,10 @@ $("backup").onclick = () =>
       }
       $("backup-password").value = "";
       $("backup-progress").textContent =
-        "备份下载完成。请保存备份密码；远程文件本体需另行备份。";
+        tr("备份下载完成。请保存备份密码；远程文件本体需另行备份。");
     } catch (e) {
       if (output) await output.abort().catch(() => {});
-      $("backup-progress").textContent = "备份未完成，请重试。";
+      $("backup-progress").textContent = tr("备份未完成，请重试。");
       throw e;
     }
   });
@@ -1420,12 +1422,12 @@ $("restore-file").onchange = async () => {
   if (!file) return;
   const password = $("backup-password").value;
   if (password.length < 12) {
-    toast("请先填写此备份的密码", true);
+    toast(tr("请先填写此备份的密码"), true);
     return;
   }
-  if (!confirm("恢复将替换所有账户、设置和本地文件，并重启服务。确认恢复？"))
+  if (!confirm(tr("恢复将替换所有账户、设置和本地文件，并重启服务。确认恢复？")))
     return;
-  $("backup-progress").textContent = "正在上传并验证备份，请勿关闭页面…";
+  $("backup-progress").textContent = tr("正在上传并验证备份，请勿关闭页面…");
   try {
     const result = await json("/api/admin/restore", {
       method: "POST",
@@ -1438,9 +1440,9 @@ $("restore-file").onchange = async () => {
     $("backup-password").value = "";
     toast(result.message);
     logoutLocal();
-    $("auth-error").textContent = "服务正在重启，请稍后使用备份中的账户登录。";
+    $("auth-error").textContent = tr("服务正在重启，请稍后使用备份中的账户登录。");
   } catch (e) {
-    $("backup-progress").textContent = "恢复未完成，原有数据未替换。";
+    $("backup-progress").textContent = tr("恢复未完成，原有数据未替换。");
     toast(e.message, true);
   }
 };
@@ -1473,7 +1475,7 @@ async function flushActivity() {
     const result = await json("/api/session/activity", { method: "POST" });
     browserSession.accept(state.token, result);
   } catch (e) {
-    if (state.token) toast("活动同步失败，网络恢复后请重试。", true);
+    if (state.token) toast(tr("活动同步失败，网络恢复后请重试。"), true);
   } finally {
     activityBusy = false;
     if (activityPending && state.token)

@@ -7,22 +7,26 @@
 - Go 单进程服务 + SQLite + 静态前端：不新增 Node 运行进程、Redis、数据库容器或 UI 框架。
 - Vue 3 适合已有 Vue 项目；原生前端如果认证、上传和隐私边界稳定，先复用样式，不为技术栈一致而重写。
 - 数据统一持久化到 /data。账户/密钥、数据库、附件索引、缓存必须在升级后保留；不把数据或凭据打进镜像。
-- 所有项目使用 appearance.js + design-system.css，三配色及关于入口共用契约，各自独立发布，不依赖另一个仓库的运行服务。
+- 所有项目使用 appearance.js + design-system.css，主题、配色、中英切换及关于入口共用契约，各自独立发布，不依赖另一个仓库的运行服务。
 - 不引入外链字体、追踪、远程 JS、CDN UI 库；移动端优先保证可读、可点、可配置。
 
-## 2. UI 契约 v1
+## 2. UI 契约 v2（图床参考版）
 
-主题：light / dark / green；system 是跟随系统模式。html[data-theme] 控制 CSS；localStorage 使用站点命名空间。电影继续兼容 trm_theme；其他站点使用 relay_theme / hub_theme。主题切换不得重新挂载页面、清空表单、重新上传、重新登录或读取私密内容。
+视觉唯一参考：Stylle/wusaqi-gallery-go，核对版本 f9bc867。已否决的直角浅灰/墨绿方案不再沿用。保留原项目版权与上游署名，不假定参考仓库自动授予第三方许可证。
+
+主题：light / dark / system；配色：solid / gradient，默认 solid。html[data-theme]、[data-style] 控制外观；电影兼容 trm_theme，其他使用 relay_theme / hub_theme。旧 green 安全回落 system。主题切换不能重新挂载页面、清空表单、上传、登录或读取私密内容。
+
+语言：zh / en，默认中文；ui-i18n.js 只翻译显式 UI 字符串。Vue 使用响应式适配器；原生 UI 使用 data-i18n 和显式绑定。绝不遍历翻译聊天、文件名、影片元数据、版本说明、代码或日志。外观和语言按浏览器保存，不覆盖业务设置。
 
 变量：--theme-bg、bg-secondary、surface-muted、text、text-secondary、primary、primary-hover、primary-active、primary-soft、on-primary、secondary、border、border-strong、disabled-bg、disabled-text、success、warning、danger、overlay、shadow、radius、motion（以上均加 --theme- 前缀）。
 
-圆角0；4/8间距；系统字体；正文14px、手机输入16px；交互热区≥44px；正文/辅助/分组/页面标题层级清晰。普通卡片无阴影，悬浮层轻微阴影。不得新增胶囊、大渐变、毛玻璃或发光卡片。
+细边框与克制圆角：按钮/输入7px、卡片10px、对话框13px，导航/主题按钮使用参考分组。系统字体14px、手机输入16px，内容宽度1250px、侧栏212px。默认靛紫纯色，保留参考的亮暗与炫彩映射。不自行发明第二套视觉体系。
 
 断点：375 / 768 / 1024；移动表单单列、导航抽屉、记录卡片或局部滚动表格。抽屉支持关闭、遮罩、Escape、焦点循环和返回；关闭时不可Tab到屏幕外。原图、弹窗与保存栏不得互相遮挡。
 
 组件状态：default / hover / active / disabled / loading / focus-visible / error / empty。加载不能当空记录，错误不能伪装成成功。危险操作确认，保留用户输入方便重试。
 
-Vue 项目 AppearanceControls.vue 仅提供主题/关于入口；所有业务仍使用原组件、状态、接口。appearance-ready 用于动态挂载后同步选择器；appearance-change 仅通知外观变化。公共脚本不发业务请求、不读取令牌、不写业务状态。
+Vue 项目 AppearanceControls.vue 仅提供主题/配色/语言/关于入口；所有业务仍使用原组件、状态、接口。appearance-ready 用于动态挂载后同步选择器；appearance-change 仅通知外观变化。公共脚本不发业务请求、不读取令牌、不写业务状态。
 
 源码与静态关于页的 design-system.css 必须相同（Vue 版本一份随业务打包，一份供独立关于页使用）；脚本修改需同步三个项目并运行 tests/appearance.test.cjs。
 
@@ -35,7 +39,7 @@ Vue 项目 AppearanceControls.vue 仅提供主题/关于入口；所有业务仍
 | Webhook | 自定义模板与自动规则 | 当前无通用Webhook设置 | 发布事件与投递记录 |
 | 登录 | 账号密码 | TOTP，可记住7天 | 账号密码、可选TOTP |
 | 定时/后台任务 | 同步与推荐调度 | 消息到期/传输/TG处理 | 通知重试、状态超时 |
-| 关于与主题 | 三主题、许可、关于页 | 同左 | 同左 |
+| 关于与主题 | 主题/配色/中英、许可、关于页 | 同左 | 同左 |
 
 统一的是配置含义、脱敏、测试按钮、反馈与设计，不能强行统一接口或改变既有安全模型。随手传目前没有通用Webhook；不得在README谎称已有。若后续增加，用独立适配器与事件队列，先定义兼容的数据迁移和测试。
 
@@ -96,7 +100,7 @@ Compose直接写参数，不要求.env。镜像名称和公开性必须实际验
 
 ## 7. 向后兼容与迁移
 
-本次UI更新不改业务API、数据库schema、会话数据、密钥或附件布局。不要删除data重新初始化。电影旧light/dark/system偏好继续可读，新增green；light现在是浅灰蓝。已有表单/API仍原样使用。
+本次UI更新不改业务API、数据库schema、会话数据、密钥或附件布局。不要删除data重新初始化。电影旧light/dark/system偏好继续可读；已废弃green回落跟随系统。已有表单/API仍原样使用。
 
 升级前做应用支持的备份或停机复制完整data（包括密钥），记录旧镜像digest。拉取/构建新镜像后只重建同一服务，挂载同一个data；不要down -v。确认登录、设置、历史和附件后再删除旧镜像。
 
@@ -111,8 +115,7 @@ Compose直接写参数，不要求.env。镜像名称和公开性必须实际验
 1. 读取AGENTS、手册、代码，git fetch核对远端，保护已有工作区。
 2. 列出真实页面/权限/API/数据/通知能力与差异，再改样式。
 3. 小步改动；主题/关于模块不得发请求或接触认证状态；共享文件同步。
-4. 运行appearance测试、原有前端/后端测试、构建；以真实浏览器检查375/768/1024/1440及三主题，验证长文本、错误、空态、未保存表单与上传。
+4. 运行appearance测试、原有前端/后端测试、构建；以真实浏览器检查375/768/1024/1440及亮暗/纯色炫彩/中英，验证长文本、错误、空态、未保存表单与上传。
 5. Docker真实启动并检查PID1非root、健康、重启持久化；无真实凭据/数据进入镜像。
 6. 记录提交、测试、镜像digest、构建产物、部署状态和未测项；CI运行中不能称通过，未推镜像不能称已发布。
 7. 报告不含凭据值，不含设备画像；完成后保留可用本地演示，提供升级/回退方法。
-

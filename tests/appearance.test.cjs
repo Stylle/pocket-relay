@@ -1,44 +1,20 @@
-const {test}=require("node:test");
-const assert=require("node:assert/strict");
-const fs=require("node:fs");
-const vm=require("node:vm");
-const path=require("node:path");
+const {test}=require("node:test"),assert=require("node:assert/strict"),fs=require("node:fs"),vm=require("node:vm"),path=require("node:path");
 const root=path.resolve(__dirname,"..");
-const base=fs.existsSync(path.join(root,"frontend/public/appearance.js"))?path.join(root,"frontend/public"):fs.existsSync(path.join(root,"web/public/appearance.js"))?path.join(root,"web/public"):path.join(root,"web");
-const script=fs.readFileSync(base+"/appearance.js","utf8");
-function fixture({saved=null,blocked=false,dark=false,id="movie"}={}){
- const listeners={},winListeners={},mediaListeners={}; let value=saved, writes=0;
- const root={dataset:{appId:id,defaultTheme:"green"}};
- const selects=[{value:""}],meta={content:""};
- const document={documentElement:root,readyState:"complete",
-  querySelector:s=>s.startsWith("meta")?meta:null,
-  querySelectorAll:s=>s==="[data-theme-select]"?selects:[],
-  addEventListener:(name,fn)=>{listeners[name]=fn;}};
- const media={matches:dark,addEventListener:(name,fn)=>{mediaListeners[name]=fn;}};
- const window={matchMedia:query=>query.includes('prefers-color-scheme')?media:{matches:false,addEventListener:()=>{}},addEventListener:(name,fn)=>{winListeners[name]=fn;},dispatchEvent:()=>true};
- const localStorage={getItem:()=>{if(blocked)throw Error("blocked");return value;},setItem:(k,v)=>{if(blocked)throw Error("blocked");value=v;writes++;}};
- vm.runInNewContext(script,{document,window,localStorage,CustomEvent:function(name,options){this.type=name;this.detail=options.detail;}});
- return {root,selects,meta,media,listeners,winListeners,mediaListeners,get stored(){return value;},get writes(){return writes;}};
+const base=["frontend/public","web/public","web"].map(p=>path.join(root,p)).find(p=>fs.existsSync(p+"/appearance.js"));
+const script=fs.readFileSync(base+"/appearance.js","utf8"),language=fs.readFileSync(base+"/ui-i18n.js","utf8");
+function fixture({saved=null,blocked=false,dark=false}={}){
+ const listeners={},winListeners={},mediaListeners={},values=new Map(saved?[["trm_theme",saved]]:[]);let writes=0;
+ const root={dataset:{appId:"movie",defaultTheme:"system"},style:{}};
+ const document={documentElement:root,readyState:"complete",querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(n,f)=>listeners[n]=f};
+ const media={matches:dark,addEventListener:(n,f)=>mediaListeners[n]=f};
+ const window={matchMedia:q=>q.includes("prefers-color-scheme")?media:{addEventListener:()=>{}},addEventListener:(n,f)=>winListeners[n]=f,dispatchEvent:()=>true};
+ const localStorage={getItem:k=>{if(blocked)throw Error("blocked");return values.get(k)||null},setItem:(k,v)=>{if(blocked)throw Error("blocked");values.set(k,v);writes++}};
+ vm.runInNewContext(script,{document,window,localStorage,CustomEvent:function(n,o){this.type=n;this.detail=o.detail}});
+ return {root,listeners,winListeners,media,mediaListeners,values,get writes(){return writes}};
 }
-test("existing theme is restored without business requests or storage mutation",()=>{
- const f=fixture({saved:"dark"}); assert.equal(f.root.dataset.theme,"dark");assert.equal(f.selects[0].value,"dark");assert.equal(f.writes,0);
- assert.doesNotMatch(script,/fetch\s*\(|XMLHttpRequest|sendBeacon|innerHTML\s*=/);
-});
-test("all three themes persist and synchronize without remounting",()=>{
- const f=fixture(); for(const value of ["light","dark","green"]){f.listeners.change({target:{matches:()=>true,value}});assert.equal(f.stored,value);assert.equal(f.root.dataset.theme,value);}
- f.winListeners.storage({key:"trm_theme",newValue:"light"});assert.equal(f.root.dataset.theme,"light");assert.equal(f.writes,3);
-});
-test("system mode follows OS changes and invalid preferences safely fall back",()=>{
- const f=fixture({saved:"system",dark:true});assert.equal(f.root.dataset.theme,"dark");f.media.matches=false;f.mediaListeners.change();assert.equal(f.root.dataset.theme,"light");
- assert.equal(fixture({saved:"invalid"}).root.dataset.theme,"green");
-});
-test("blocked storage does not break rendering or theme selection",()=>{
- const f=fixture({blocked:true});f.listeners.change({target:{matches:()=>true,value:"dark"}});assert.equal(f.root.dataset.theme,"dark");
-});
-test("all theme palettes and copyright/about pages are shipped locally",()=>{
- const css=fs.readFileSync(base+"/design-system.css","utf8");
- assert.match(css,/data-theme=dark/);assert.match(css,/data-theme=green/);assert.match(css,/--theme-radius:0px/);
- const page=fs.readFileSync(base+"/about.html","utf8");assert.match(page,/MIT License/);assert.match(page,/viewport/);
- assert.doesNotMatch(page,/https?:\/\/[^" ]+\.js/);
-});
-
+test("restores existing theme without business requests",()=>{const f=fixture({saved:"dark"});assert.equal(f.root.dataset.theme,"dark");assert.equal(f.writes,0);assert.doesNotMatch(script,/fetch\s*\(|XMLHttpRequest|innerHTML\s*=/)});
+test("light/dark/system persist independently of color style",()=>{const f=fixture();for(const value of ["light","dark","system"]){f.listeners.change({target:{matches:()=>true,value}});assert.equal(f.values.get("trm_theme"),value)}assert.equal(f.root.dataset.style,"solid");f.winListeners.storage({key:"movie_style",newValue:"gradient"});assert.equal(f.root.dataset.style,"gradient");assert.equal(f.writes,3)});
+test("system follows OS and obsolete green preference falls back safely",()=>{const f=fixture({saved:"system",dark:true});assert.equal(f.root.dataset.theme,"dark");f.media.matches=false;f.mediaListeners.change();assert.equal(f.root.dataset.theme,"light");assert.equal(fixture({saved:"green"}).root.dataset.themeChoice,"system")});
+test("blocked storage cannot break appearance",()=>{const f=fixture({blocked:true});f.listeners.change({target:{matches:()=>true,value:"dark"}});assert.equal(f.root.dataset.theme,"dark")});
+test("reference palettes and local about page are included",()=>{const css=fs.readFileSync(base+"/design-system.css","utf8"),page=fs.readFileSync(base+"/about.html","utf8");assert.match(css,/#5b57c7/);assert.match(css,/data-style='solid'/);assert.match(css,/--radius: 10px/);assert.match(page,/MIT License/);assert.match(page,/viewport/);assert.doesNotMatch(page,/https?:\/\/[^" ]+\.js/)});
+test("language changes only explicitly registered interface elements",()=>{const root={dataset:{appId:"relay"}},events={},values=new Map(),buttons=[],bound={textContent:"本次消息",isConnected:true};const attrs=new Map();bound.setAttribute=(k,v)=>attrs.set(k,v);bound.getAttribute=k=>attrs.get(k)??null;bound.removeAttribute=k=>attrs.delete(k);const document={documentElement:root,readyState:"complete",querySelectorAll:s=>s.startsWith("[data-ui-")?[bound]:buttons};const window={addEventListener:(n,f)=>events[n]=f,dispatchEvent:()=>true};const localStorage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)};vm.runInNewContext(language,{document,window,localStorage,CustomEvent:function(){}});window.AppI18n.bind(bound,"本次消息");window.AppI18n.set("en");assert.equal(bound.textContent,"This session");assert.equal(root.lang,"en");assert.equal(values.get("relay_lang"),"en");bound.textContent="User text must not be touched";window.AppI18n.set("zh");assert.equal(bound.textContent,"User text must not be touched");assert.doesNotMatch(language,/MutationObserver|fetch\s*\(|innerHTML\s*=/)});

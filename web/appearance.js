@@ -1,19 +1,26 @@
-/* Appearance contract v1. No credentials, business requests, or remote assets. */
+/* Gallery appearance contract v2. No credentials, business requests, or remote assets. */
 (function () {
  "use strict";
  const root = document.documentElement;
  const id = root.dataset.appId;
  const key = id === "movie" ? "trm_theme" : id + "_theme";
- const choices = ["light", "dark", "green", "system"];
+ const choices = ["light", "dark", "system"];
  const media = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
- let choice = root.dataset.defaultTheme || "light";
+ let choice = root.dataset.defaultTheme || "system";
+ let palette="solid"; try {if(localStorage.getItem(id+"_style")==="gradient")palette="gradient"}catch{}
+ const tr=s=>window.AppI18n?window.AppI18n.t(s):s;
  try { const saved = localStorage.getItem(key); if (choices.includes(saved)) choice = saved; } catch {}
  function sync() {
   root.dataset.themeChoice = choice;
+  root.dataset.style=palette;
+  document.querySelectorAll("[data-appearance-open],[data-about-open],[data-theme-choice]").forEach(el=>{const label=el.hasAttribute("data-appearance-open")?"外观设置":el.hasAttribute("data-about-open")?"关于":({light:"亮色",dark:"暗色",system:"跟随系统"}[el.dataset.themeChoice]);if(label){el.setAttribute("aria-label",tr(label));el.title=tr(label)}});
+  root.style.colorScheme=choice==="system"?(media&&media.matches?"dark":"light"):choice;
+  document.querySelectorAll("[data-theme-choice]").forEach(el=>{el.classList.toggle("on",el.dataset.themeChoice===choice);el.setAttribute("aria-pressed",String(el.dataset.themeChoice===choice))});
+  document.querySelectorAll("[data-style-choice]").forEach(el=>{el.classList.toggle("on",el.dataset.styleChoice===palette);el.setAttribute("aria-pressed",String(el.dataset.styleChoice===palette))});
   root.dataset.theme = choice === "system" ? (media && media.matches ? "dark" : "light") : choice;
   document.querySelectorAll("[data-theme-select]").forEach(el => { el.value = choice; });
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = root.dataset.theme === "dark" ? "#15181d" : choice === "green" ? "#f3f6f4" : "#f4f5f7";
+  if (meta) meta.content = root.dataset.theme === "dark" ? "#15181d" : "#fbfbfe";
  }
  function apply(value, persist) {
   if (!choices.includes(value)) return;
@@ -24,16 +31,27 @@
  sync();
  if (media && media.addEventListener) media.addEventListener("change", sync);
  window.addEventListener("storage", event => {
-  if (event.key === key) apply(event.newValue || root.dataset.defaultTheme || "light", false);
+  if (event.key === key) apply(event.newValue || root.dataset.defaultTheme || "system", false);
+  if(event.key===id+"_style"){palette=event.newValue==="gradient"?"gradient":"solid";sync()}
  });
  window.addEventListener("appearance-ready", sync);
+ window.addEventListener("ui-language-change",sync);
  document.addEventListener("change", event => {
   if (event.target.matches("[data-theme-select]")) apply(event.target.value, true);
  });
  let about;
+ let appearance;
+ function showAppearance(){
+  if(!appearance){appearance=el("dialog",undefined,"about-dialog");appearance.setAttribute("aria-label","Appearance");appearance.append(el("h2","界面与语言"));
+   const sections=[["主题",["light","dark","system"],["亮色","暗色","跟随系统"],"themeChoice"],["配色",["solid","gradient"],["纯色","炫彩"],"styleChoice"],["语言",["zh","en"],["中文","English"],"languageChoice"]];
+   for(const [title,values,labels,field]of sections){appearance.append(el("h3",title));const row=el("div",undefined,"row appearance-options");values.forEach((value,i)=>{const b=el("button",labels[i]);b.type="button";b.dataset[field]=value;row.append(b)});appearance.append(row)}
+   const actions=el("div",undefined,"about-actions");const close=el("button","关闭","primary");close.type="button";close.addEventListener("click",()=>appearance.close());actions.append(close);appearance.append(actions);document.body.append(appearance)
+  }sync();if(!appearance.open)appearance.showModal();
+ }
  function el(tag, text, className) {
   const node = document.createElement(tag);
-  if (text !== undefined) node.textContent = text;
+  if (text !== undefined) node.textContent = tr(text);
+  if(text!==undefined&&window.AppI18n)window.AppI18n.bind(node,text);
   if (className) node.className = className;
   return node;
  }
@@ -88,13 +106,21 @@
   const drawer = host.querySelector("[data-drawer]");
   if (drawer) {
    drawer.setAttribute("aria-modal","true"); drawer.setAttribute("role","dialog");
-   const focus = drawer.querySelector("button,a,select,input,[tabindex]");
-   if (focus) focus.focus();
+   const focus = Array.from(drawer.querySelectorAll("button,a,select,input,[tabindex]")).find(el => !el.disabled && el.getClientRects().length);
+   if (focus) {
+    // Wait for the visibility transition before focusing; a hidden element cannot receive focus.
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => { if (drawerHost === host && focus.isConnected) focus.focus(); }));
+   }
   }
  }
  document.addEventListener("click", event => {
   const target = event.target.closest("button,a");
   if (!target) return;
+  if(target.matches("[data-theme-choice]"))apply(target.dataset.themeChoice,true);
+  if(target.matches("[data-style-choice]")){palette=target.dataset.styleChoice;try{localStorage.setItem(id+"_style",palette)}catch{}sync()}
+  if(target.matches("[data-language-choice]")&&window.AppI18n)window.AppI18n.set(target.dataset.languageChoice);
+  if(target.matches("[data-lang-toggle]")&&window.AppI18n)window.AppI18n.set(window.AppI18n.lang==="zh"?"en":"zh");
+  if(target.matches("[data-appearance-open]")){event.preventDefault();showAppearance()}
   if (target.matches("[data-about-open]")) { event.preventDefault(); showAbout(); }
   if (target.matches("[data-drawer-toggle]")) {
    const host = target.closest("[data-drawer-host]");
@@ -103,7 +129,7 @@
   if (target.matches("[data-drawer-close]") || (target.closest("[data-drawer] nav") && !target.matches("[data-about-open]"))) closeDrawer();
  });
  document.addEventListener("keydown", event => {
-  if (!drawerHost || (about && about.open)) return;
+  if (!drawerHost || (about && about.open) || (appearance&&appearance.open)) return;
   if (event.key === "Escape") { event.preventDefault(); closeDrawer(); return; }
   if (event.key !== "Tab") return;
   const nodes = Array.from(drawerHost.querySelectorAll("[data-drawer] button,[data-drawer] a,[data-drawer] input,[data-drawer] select")).filter(n => !n.disabled && n.getClientRects().length);
@@ -113,10 +139,9 @@
  });
  window.addEventListener("hashchange",closeDrawer);
  if (window.matchMedia) {
-  const desktop = window.matchMedia("(min-width:1025px)");
+  const desktop = window.matchMedia("(min-width:769px)");
   if (desktop.addEventListener) desktop.addEventListener("change", event => { if (event.matches) closeDrawer(); });
  }
  function ready() { sync(); }
  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded",ready,{once:true}); else ready();
 })();
-
