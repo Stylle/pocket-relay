@@ -1224,9 +1224,8 @@ function updateBindingStatus(result) {
  const cfg=result.config||{};telegramConfigured=!!result.configured;
  if(telegramRevision && telegramRevision!==result.revision){$("tg-command-box").hidden=true;$("tg-command").value="";}
  telegramRevision=result.revision||"";
- $("tg-enabled").checked=!!cfg.enabled;
  $("tg-binding-status").textContent=tr(!result.configured?"尚未保存 Token":!cfg.enabled?"机器人已停用":cfg.chat_id?"已绑定":"已保存，等待绑定");
- $("tg-unbind").hidden=!cfg.chat_id;$("tg-toggle").textContent=tr(cfg.enabled?"停用机器人":"启用机器人");
+ $("tg-unbind").hidden=!cfg.chat_id;
  $("tg-pair").disabled=telegramBusy||!result.configured||!cfg.enabled||!!$("tg-token").value.trim();
 
 }
@@ -1239,9 +1238,8 @@ async function saveTelegram(enabled){
  await json("/api/admin/telegram",{method:"PUT",body:JSON.stringify({enabled,bindFlow:true,receive:$("tg-receive").checked,send:$("tg-send").checked,include_concealed:$("tg-private").checked,receive_concealed:$("tg-receive-private").checked,token:$("tg-token").value.trim(),revision:telegramRevision})});
  $("tg-command-box").hidden=true;$("tg-command").value="";await loadTelegram();toast(tr("保存成功"));
 }
-$("telegram-form").onsubmit=event=>{event.preventDefault();telegramAction(event.submitter,()=>saveTelegram(true));};
+$("telegram-form").onsubmit=event=>{event.preventDefault();telegramAction(event.submitter,()=>saveTelegram($("tg-enabled").checked));};
 $("tg-token").oninput=()=>{$("tg-pair").disabled=telegramBusy||!telegramConfigured||!$("tg-enabled").checked||!!$("tg-token").value.trim();};
-$("tg-toggle").onclick=()=>telegramAction($("tg-toggle"),()=>saveTelegram(!$("tg-enabled").checked));
 $("tg-pair").onclick=()=>telegramAction($("tg-pair"),async()=>{const result=await json("/api/admin/telegram/pair",{method:"POST"});$("tg-command").value=result.command;telegramExpiry=Date.now()+result.expiresIn*1000;$("tg-command-box").hidden=false;});
 $("tg-unbind").onclick=()=>telegramAction($("tg-unbind"),async()=>{await json("/api/admin/telegram/unbind",{method:"POST"});await loadTelegram();});
 $("tg-command").onfocus=()=>$("tg-command").select();

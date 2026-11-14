@@ -355,18 +355,20 @@
           <form id="telegram-form" class="settings-card bot-binding-card">
 <h2 data-i18n="Telegram 机器人">Telegram 机器人</h2>
 <p class="muted" data-i18n="填写 Token 并保存，生成绑定码后，在机器人私聊中发送完整的 /bind 指令即可。">填写 Token 并保存，生成绑定码后，在机器人私聊中发送完整的 /bind 指令即可。</p>
-<label>Bot Token<input id="tg-token" type="password" autocomplete="new-password" spellcheck="false" /></label>
-<div class="binding-actions"><button class="primary" data-i18n="保存设置">保存设置</button><button id="tg-pair" type="button" data-i18n="生成绑定码">生成绑定码</button><button id="tg-unbind" class="ghost" type="button" hidden data-i18n="解除绑定">解除绑定</button></div>
-<p id="tg-binding-status" class="binding-status" role="status"></p>
-<div id="tg-command-box" class="binding-command" hidden><label for="tg-command" data-i18n="在 Telegram 私聊发送以下完整指令">在 Telegram 私聊发送以下完整指令</label><input id="tg-command" readonly autocomplete="off" spellcheck="false" /><p class="muted" data-i18n="绑定码五分钟有效、仅可使用一次。请勿分享，重新生成会使旧码失效。">绑定码五分钟有效、仅可使用一次。请勿分享，重新生成会使旧码失效。</p></div>
-<details><summary data-i18n="更多设置">更多设置</summary><input id="tg-enabled" type="checkbox" hidden /><button id="tg-toggle" type="button" class="ghost">停用机器人</button>
+<label class="check"><input id="tg-enabled" type="checkbox" /><span data-i18n="开启 Telegram 机器人">开启 Telegram 机器人</span></label>
+<label>Telegram Bot Token<input id="tg-token" type="password" autocomplete="new-password" spellcheck="false" /></label>
 <label class="check"><input id="tg-receive" type="checkbox" checked /><span data-i18n="接收 TG 消息到网站">接收 TG 消息到网站</span></label>
 <label class="check"><input id="tg-receive-private" type="checkbox" checked /><span data-i18n="收到的 TG 消息默认设为隐私（含图片与附件）">收到的 TG 消息默认设为隐私（含图片与附件）</span></label>
 <label class="check"><input id="tg-send" type="checkbox" checked /><span data-i18n="网站新消息发送到 TG">网站新消息发送到 TG</span></label>
 <label class="check"><input id="tg-private" type="checkbox" /><span data-i18n="同时转发隐私遮挡消息（含正文与附件）">同时转发隐私遮挡消息（含正文与附件）</span></label>
 <p class="warning">开启发送后 Telegram 会保存消息副本；网页删除或到期不会删除该副本。附件接收最多 20 MB、发送最多 50 MB。仅同步绑定私聊，不补发历史消息。</p>
-<button id="tg-retry" class="secondary" type="button" data-i18n="重试失败发送">重试失败发送</button><p id="tg-status" class="muted small" role="status"></p>
-</details></form>
+<div class="binding-actions"><button class="primary" data-i18n="保存设置">保存设置</button></div>
+<section class="telegram-section"><h3 data-i18n="连接与账户绑定">连接与账户绑定</h3>
+<p id="tg-binding-status" class="binding-status" role="status"></p>
+<div id="tg-command-box" class="binding-command" hidden><label for="tg-command" data-i18n="在 Telegram 私聊发送以下完整指令">在 Telegram 私聊发送以下完整指令</label><input id="tg-command" readonly autocomplete="off" spellcheck="false" /><p class="muted" data-i18n="绑定码五分钟有效、仅可使用一次。请勿分享，重新生成会使旧码失效。">绑定码五分钟有效、仅可使用一次。请勿分享，重新生成会使旧码失效。</p></div>
+<div class="binding-actions"><button id="tg-pair" type="button" data-i18n="生成我的绑定码">生成我的绑定码</button><button id="tg-unbind" type="button" class="ghost" hidden data-i18n="解除绑定">解除绑定</button></div>
+<button id="tg-retry" type="button" class="secondary" data-i18n="重试失败发送">重试失败发送</button><p id="tg-status" class="muted small" role="status"></p></section>
+<section class="telegram-section"><h3 data-i18n="机器人指令">机器人指令</h3><dl class="telegram-commands"><dt><code>/help</code></dt><dd>消息同步帮助</dd><dt><code>/bind 绑定码</code></dt><dd>绑定当前网站账户</dd></dl></section></form>
           <form id="storage-form" class="settings-card">
             <h3 data-i18n="添加远程存储">添加远程存储</h3>
             <div class="form-grid">
