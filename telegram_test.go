@@ -261,7 +261,7 @@ func TestTelegramOutboxPrivacyRetryAndFileUpload(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
- if uploaded != "test attachment" || len(texts) != 2 || texts[0] != "outgoing" {
+	if uploaded != "test attachment" || len(texts) != 2 || texts[0] != "outgoing" {
 		t.Fatal("text or file delivery failed")
 	}
 }
