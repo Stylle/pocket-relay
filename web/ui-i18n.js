@@ -1,5 +1,6 @@
 /* UI strings only. User content is never scanned or translated. */
 (function(){'use strict';const root=document.documentElement;const key=root.dataset.appId+'_lang';const EN={
+"今日消息":"Today’s messages","今天还没有消息":"No messages today","按当前设备的本地日期显示，发送一条消息开始吧。":"Shown by this device’s local date. Send a message to get started.",
 "退出未完成，请检查网络后重试。当前会话仍可能有效。":"Sign-out could not finish. Check your connection and retry; this session may still be active.","备份请求已提交，请在浏览器下载列表查看进度与结果。":"Backup requested. Check the browser download list for progress and results.","服务重新加载耗时较长。请稍后刷新页面，勿重复导入。":"Reload is taking longer than expected. Refresh later; do not import again.","影片列表来自飞牛；图片由当前设备按已保存的数据源顺序加载，已有缓存仅作回退，不从飞牛下载图片。":"FnOS supplies the movie list. This device loads posters in the saved source order, with existing cache as fallback; FnOS images are not downloaded.","TMDB 尚未配置，将跳过该来源；其他已配置来源和缓存仍可使用。":"TMDB is not configured and will be skipped. Other configured sources and existing cache remain available.","验证器登录":"Authenticator sign-in",
 
 "登录后管理媒体库、选片偏好与通知。":"Manage your media library, selection preferences and notifications after signing in.",

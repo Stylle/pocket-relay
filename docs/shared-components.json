@@ -3,10 +3,10 @@
   "components": [
     {
       "name": "theme",
-      "version": "2026-11-14",
+      "version": "2026-11-14.1",
       "source": "web/design-system.css",
       "mirrors": [],
-      "sha256": "ec409ce8a03b8137da76c64054686891a2b3e29ac7787ec4ba3e1517e6fe4e61"
+      "sha256": "25d50b21c37c956c9bfee9da9e7c7cdddfa48eb6c35004da5233ee67a1574e74"
     }
   ]
 }

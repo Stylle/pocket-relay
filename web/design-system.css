@@ -61,8 +61,8 @@
 :root[data-app-id] pre,:root[data-app-id] code{background:var(--accent-soft);color:var(--text)}
 /* New appearance UI only; never reposition existing business containers. */
 .appearance-controls{display:flex;align-items:center;gap:6px;flex-shrink:0}
-:root[data-app-id] .theme-switch{display:flex;gap:2px;padding:3px;border:.5px solid var(--border);border-radius:8px;background:var(--surface)}
-:root[data-app-id] .theme-switch button{min-width:32px;min-height:30px;padding:4px 8px;line-height:1.4;border:0;border-radius:8px;background:transparent;color:var(--muted);box-shadow:none;font-size:13px}
+:root[data-app-id] .theme-switch{display:flex;align-items:center;gap:2px;padding:3px;border:.5px solid var(--border);border-radius:8px;background:var(--surface)}
+:root[data-app-id] .theme-switch button{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:30px;padding:4px 8px;line-height:1.4;border:0;border-radius:8px;background:transparent;color:var(--muted);box-shadow:none;font-size:13px}
 :root[data-app-id] .theme-switch button.on,:root[data-app-id] .appearance-options button.on{background:var(--grad-accent);color:var(--on-accent)}
 :root[data-app-id] .appearance-controls>button{min-width:32px;min-height:32px;padding:4px 7px;border:0;border-radius:7px;background:transparent}
 :root[data-app-id=relay] .auth-panel{position:relative}

@@ -194,6 +194,28 @@ async function login(f) {
   await settle();
   assert.equal(f.$("workspace").hidden, false);
 }
+
+test("today view requests local calendar boundaries across all account history", async (t) => {
+  const f = fixture(t);
+  await settle();
+  await login(f);
+  f.w.document.querySelector('[data-view="today"]').click();
+  await settle();
+  const call = f.calls.filter(c => c.path.startsWith('/api/messages?')).at(-1);
+  const query = new URL(call.path, 'http://localhost').searchParams;
+  const now = new Date();
+  assert.equal(query.get('scope'), 'all');
+  assert.equal(Number(query.get('from')), new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime());
+  assert.equal(Number(query.get('to')), new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime());
+  assert.equal(f.$('view-title').textContent, '今日消息');
+  assert.equal(f.$('composer').hidden, false);
+  assert.match(f.$('timeline').textContent, /今天还没有消息/);
+  f.w.document.querySelector('[data-view="all"]').click();
+  await settle();
+  const all = new URL(f.calls.filter(c => c.path.startsWith('/api/messages?')).at(-1).path, 'http://localhost').searchParams;
+  assert.equal(all.has('from'), false);
+  assert.equal(all.has('to'), false);
+});
 test("login preserves refresh continuity without storing token in localStorage", async (t) => {
   const f = fixture(t);
   await settle();

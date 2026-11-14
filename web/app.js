@@ -344,17 +344,18 @@ async function setView(view) {
     .forEach((b) => b.classList.toggle("active", b.dataset.view === view));
   uiText($("view-title"),{
     messages: tr("本次消息"),
+    today: tr("今日消息"),
     all: tr("全部信息"),
     files: tr("文件信息"),
     settings: tr("设备设置"),
     admin: tr("管理后台"),
   }[view]);
-  $("messages-view").hidden = !["messages", "all", "files"].includes(view);
+  $("messages-view").hidden = !["messages", "today", "all", "files"].includes(view);
   $("settings-view").hidden = view !== "settings";
   $("admin-view").hidden = view !== "admin";
-  $("composer").hidden = !["messages", "all", "files"].includes(view);
+  $("composer").hidden = !["messages", "today", "all", "files"].includes(view);
   if (view === "admin") await loadAdmin();
-  else if (["messages", "all", "files"].includes(view)) {
+  else if (["messages", "today", "all", "files"].includes(view)) {
     state.signature = "";
     showMessageLoading();
     await refresh();
@@ -638,6 +639,8 @@ function renderMessages() {
         uiNode("p", "muted", "历史记录已折叠，本页只显示本次登录后发送的消息。"),
         button(tr("查看全部信息"), () => setView("all"), "secondary"),
       );
+    } else if (state.view === "today") {
+      empty.replaceChildren(uiNode("h2", "", "今天还没有消息"), uiNode("p", "muted", "按当前设备的本地日期显示，发送一条消息开始吧。"));
     } else if (state.filters) {
       empty.replaceChildren(uiNode("h2", "", "没有找到符合条件的消息。"));
     }
@@ -844,18 +847,42 @@ $("search-form").onsubmit = async (event) => {
   uiText($("search-status"),tr("搜索范围：此账户的全部记录（含已折叠历史）。"));
   await refresh();
 };
+function todayBounds(now = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  return [start.getTime(), end.getTime()];
+}
+let todayStart = 0;
 function messageQuery() {
   const query = new URLSearchParams(state.filters);
   query.set(
     "scope",
     state.filters || state.view !== "messages" ? "all" : "current",
   );
+  if (state.view === "today") {
+    const [from, to] = todayBounds();
+    query.set("from", from);
+    query.set("to", to);
+  }
   if (state.view === "files") query.set("files", "1");
   return query;
 }
 async function refresh() {
   if (!state.token || state.polling) return;
-  if (!["messages", "all", "files"].includes(state.view)) return;
+  if (!["messages", "today", "all", "files"].includes(state.view)) return;
+  if (state.view === "today") {
+    const [start] = todayBounds();
+    if (start !== todayStart) {
+      todayStart = start;
+      state.generation++;
+      state.older = [];
+      state.messages = [];
+      state.hasMore = false;
+      state.signature = "";
+      state.etag = "";
+      showMessageLoading();
+    }
+  }
   const generation = state.generation;
   const controller = new AbortController();
   messageRequest = controller;
@@ -960,7 +987,7 @@ setInterval(() => {
   if (
     state.token &&
     !document.hidden &&
-    ["messages", "all", "files"].includes(state.view)
+    ["messages", "today", "all", "files"].includes(state.view)
   )
     refresh();
 }, 4000);
@@ -1041,7 +1068,7 @@ document.addEventListener("drop", (e) => {
   if (!state.token) return;
   e.preventDefault();
   addFiles(e.dataTransfer.files);
-  if (!["messages", "files"].includes(state.view)) setView("messages");
+  if (!["messages", "today", "files"].includes(state.view)) setView("messages");
 });
 $("retention").onchange = () => {
   const custom = $("retention").value === "custom";
