@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "components": [
+    {
+      "name": "theme",
+      "version": "2026-11-14",
+      "source": "web/design-system.css",
+      "mirrors": [],
+      "sha256": "ec409ce8a03b8137da76c64054686891a2b3e29ac7787ec4ba3e1517e6fe4e61"
+    }
+  ]
+}

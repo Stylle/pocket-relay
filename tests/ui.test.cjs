@@ -180,6 +180,7 @@ function fixture(
   if(language)w.eval(fs.readFileSync("web/ui-i18n.js", "utf8"));
   w.eval(fs.readFileSync("web/session.js", "utf8"));
   w.eval(fs.readFileSync("web/message-text.js", "utf8"));
+  w.eval(fs.readFileSync("web/api.js", "utf8"));
   w.eval(
     script +
       "\nwindow.__test={state,setView,refresh,renderMessages,renderAttachments,browserSession,recordActivity,flushActivity,expireSession};",

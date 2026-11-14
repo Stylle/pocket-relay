@@ -104,45 +104,7 @@ function size(n) {
   return (n / 1024 ** 3).toFixed(2) + " GB";
 }
 function date(n) { return dateFormatter.format(n); }
-async function api(path, options = {}) {
-  const requestToken = state.token;
-  const headers = new Headers(options.headers);
-  headers.set("X-Relay-Session", "1");
-  if (state.token) headers.set("Authorization", "Bearer " + state.token);
-  if (
-    options.body &&
-    typeof options.body === "string" &&
-    !headers.has("Content-Type")
-  )
-    headers.set("Content-Type", "application/json");
-  const res = await fetch(path, { ...options, headers, cache: "no-store" });
-  if (requestToken && requestToken !== state.token)
-    throw Error("登录状态已改变，请重新操作");
-  if (!res.ok && res.status !== 304) {
-    const b = await res.json().catch(() => ({}));
-    if (res.status === 401 && state.token) {
-      logoutLocal();
-      toast(b.error || tr("请重新验证"), true);
-    }
-    const error = Error(b.error || "请求失败，请检查网络（" + res.status + "）");
-    error.status = res.status;
-    throw error;
-  }
-  return res;
-}
-async function json(path, options = {}) {
-  return (await api(path, options)).json();
-}
-async function action(b, fn) {
-  b.disabled = true;
-  try {
-    return await fn();
-  } catch (e) {
-    toast(e.message, true);
-  } finally {
-    b.disabled = false;
-  }
-}
+const {api, json, action} = createRelayAPI({getToken: () => state.token, onUnauthorized: logoutLocal, notify: toast, translate: tr});
 function authMode(mode) {
   state.mode = mode;
   state.enrollment = "";

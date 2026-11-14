@@ -15,3 +15,6 @@ runtime
 *.sqlite-*
 *.db
 *.db-*
+
+.browser-qa
+build

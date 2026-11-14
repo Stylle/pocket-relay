@@ -30,8 +30,7 @@ func setRememberCookie(w http.ResponseWriter, r *http.Request, value string, unt
 	if value != "" {
 		maxAge = max(1, int(time.Until(until).Seconds()))
 	}
-	// HTTPS reverse proxies normally supply an HTTPS Origin on the login POST.
-	secure := r.TLS != nil || strings.HasPrefix(r.Header.Get("Origin"), "https://")
+	secure := requestHTTPS(r)
 	http.SetCookie(w, &http.Cookie{Name: rememberCookie, Value: value, Path: "/api/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, MaxAge: maxAge, Expires: until})
 }
 

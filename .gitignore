@@ -4,3 +4,7 @@
 /pocket-relay
 *.log
 /node_modules/
+
+/.browser-qa/
+
+/build/
