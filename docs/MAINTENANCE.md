@@ -17,3 +17,5 @@ Plain HTTP LAN deployment remains supported. When terminating HTTPS at a reverse
 Use independent tags and keep each existing Docker repository. Run tests/build, backup/export-import in a disposable second instance, verify original accounts and files, non-root container startup and persistence. Keep the complete data directory and matching key. Never delete volumes for a migration. No report claims a completed deep security scan until the scanner actually succeeds.
 
 Gallery image publication can use an authenticated local Docker CLI after CI succeeds. The optional manual release workflow requires Docker Hub Actions secrets and a selected version tag.
+
+Minimum Go toolchain: 1.26.11 (or a supported newer patched release). Browser CI pins Ubuntu 24.04 for the pinned Playwright build rather than silently following a new unsupported runner OS.
