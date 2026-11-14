@@ -34,3 +34,7 @@ Docker Hub 发布凭据使用 DOCKERHUB_USERNAME、DOCKERHUB_TOKEN；GitHub Acti
 - 文本、文件复制保持原内容；Telegram 发送正文不拼接设备来源前缀。
 - 主题与语言使用顶栏紧凑入口，不新增占据侧栏的外观设置块。
 - 隐私消息默认不自动载入，Telegram 转发必须遵守原有显式隐私开关。
+
+## 通知与测试约定
+
+配置权限、账户模型保持原样，不新增分用户配置。Telegram 使用保存 Token、一次性绑定码、私聊 /bind；不恢复手填 Chat ID 和测试发送按钮。绑定和启动后注册原有业务菜单。Webhook/飞牛直接测试当前草稿，不保存、不启用、空密钥只在服务端合并；保存与测试互斥并拒绝过期结果。共享模块及 Vue 面板按 shared-components.json 同步。详见 integration-tests.md。

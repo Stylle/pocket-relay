@@ -7,6 +7,34 @@
       "source": "web/design-system.css",
       "mirrors": [],
       "sha256": "9e8d75b754dbd3dd82514f72976767aea4e85829b4605ccf39e9acc9e4eadeb6"
+    },
+    {
+      "name": "integration-test",
+      "version": "2026-11-15",
+      "source": "internal/integrationtest/probe.go",
+      "mirrors": [],
+      "sha256": "22d6a860119f0119c717c33cda0ed8f79bb9364d7d573a7fcc35eff6c8cabc48"
+    },
+    {
+      "name": "integration-draft-ui",
+      "version": "2026-11-15",
+      "source": "web/draft-test.js",
+      "mirrors": [],
+      "sha256": "6d70086c12acaab90a11e506644091c703dffe0320553138c72d8fb274413c48"
+    },
+    {
+      "name": "telegram-binding",
+      "version": "2026-11-15",
+      "source": "internal/integrationtest/binding.go",
+      "mirrors": [],
+      "sha256": "5ce823568208d24b2bf84152d9f112f1e272e6c8c3e8e1cfecabf9db8b9af9fc"
+    },
+    {
+      "name": "telegram-binding-style",
+      "version": "2026-11-15",
+      "source": "web/binding-panel.css",
+      "mirrors": [],
+      "sha256": "388f415ec24e2b0124598d6d31a0e28b3bb24c135e96738749b7c78ccad7bdff"
     }
   ]
 }

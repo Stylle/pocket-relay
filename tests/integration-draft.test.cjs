@@ -1,0 +1,4 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs'),vm=require('node:vm');
+const sandbox={};vm.createContext(sandbox);vm.runInContext(fs.readFileSync(__dirname+'/../web/draft-test.js','utf8'),sandbox);
+test('test sends the current draft without mutating it',async()=>{const draft={url:'https://example.com/new',token:'fixture-secret'};let sent;const result=await sandbox.IntegrationDraft.run(()=>draft,async value=>{sent=value;return{ok:true}});assert.equal(sent.url,draft.url);assert.equal(result.ok,true);assert.equal(draft.token,'fixture-secret');assert.notEqual(sent,draft)});
+test('late result cannot validate a newly edited form',async()=>{const draft={token:'first'};let finish;const pending=sandbox.IntegrationDraft.run(()=>draft,()=>new Promise(resolve=>finish=resolve));draft.token='second';finish({ok:true});await assert.rejects(pending,/配置已修改/)});

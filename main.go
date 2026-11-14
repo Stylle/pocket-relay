@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	probe "github.com/Stylle/pocket-relay/internal/integrationtest"
 	"io"
 	"io/fs"
 	"log"
@@ -28,7 +29,7 @@ import (
 //go:embed web/*
 var assets embed.FS
 
-const version = "0.8.0"
+const version = "0.9.0"
 
 type user struct {
 	ID      string `json:"id"`
@@ -56,15 +57,16 @@ type bucket struct {
 	Until time.Time
 }
 type app struct {
-	db        *sql.DB
-	dir       string
-	key       []byte
-	mu        sync.Mutex
-	sessions  map[string]session
-	pending   map[string]enrollment
-	rotations map[string]authenticatorRotation
-	tickets   map[string]ticket
-	attempts  map[string]bucket
+	botBinding probe.Binding
+	db         *sql.DB
+	dir        string
+	key        []byte
+	mu         sync.Mutex
+	sessions   map[string]session
+	pending    map[string]enrollment
+	rotations  map[string]authenticatorRotation
+	tickets    map[string]ticket
+	attempts   map[string]bucket
 	// Serialize backup/restore and writes, not normal reads or streamed downloads.
 	gate        sync.RWMutex
 	restart     chan struct{}
@@ -288,8 +290,9 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("GET /api/admin", a.adminGet)
 	mux.HandleFunc("PUT /api/admin", a.adminSave)
 	mux.HandleFunc("GET /api/admin/telegram", a.telegramGet)
+	mux.HandleFunc("POST /api/admin/telegram/pair", a.relayBindingRoute)
+	mux.HandleFunc("POST /api/admin/telegram/unbind", a.relayBindingRoute)
 	mux.HandleFunc("PUT /api/admin/telegram", a.telegramSave)
-	mux.HandleFunc("POST /api/admin/telegram/test", a.telegramTest)
 	mux.HandleFunc("POST /api/admin/telegram/retry", a.telegramRetry)
 	mux.HandleFunc("POST /api/admin/storage", a.addStore)
 	mux.HandleFunc("POST /api/admin/storage/test", a.testStore)

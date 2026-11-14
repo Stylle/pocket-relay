@@ -87,12 +87,14 @@ type telegramInput struct {
 	ChatID           string `json:"chat_id"`
 	Token            string `json:"token"`
 	Revision         string `json:"revision"`
+	BindFlow         bool   `json:"bindFlow"`
 }
 
 var telegramTokenPattern = regexp.MustCompile(`^[0-9]{5,20}:[A-Za-z0-9_-]{20,100}$`)
 
 func (a *app) telegramSave(w http.ResponseWriter, r *http.Request) {
-	if _, ok := a.admin(w, r); !ok {
+	owner, ok := a.admin(w, r)
+	if !ok {
 		return
 	}
 	var in telegramInput
@@ -115,9 +117,21 @@ func (a *app) telegramSave(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "Bot Token 格式不正确")
 		return
 	}
+	if in.BindFlow {
+		if in.Token == previous.Token {
+			in.ChatID = previous.ChatID
+			in.UserID = previous.UserID
+		} else {
+			in.ChatID = ""
+			in.UserID = owner.ID
+		}
+		if in.UserID == "" {
+			in.UserID = owner.ID
+		}
+	}
 	if in.Enabled {
 		id, e := strconv.ParseInt(in.ChatID, 10, 64)
-		if e != nil || id <= 0 || strconv.FormatInt(id, 10) != in.ChatID {
+		if !in.BindFlow && (e != nil || id <= 0 || strconv.FormatInt(id, 10) != in.ChatID) {
 			fail(w, 400, "请填写正整数私聊 Chat ID，不支持群聊")
 			return
 		}
@@ -131,7 +145,7 @@ func (a *app) telegramSave(w http.ResponseWriter, r *http.Request) {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 		defer cancel()
-		if _, e = a.checkTelegram(ctx, in.Token, in.Receive); e != nil {
+		if _, e = a.checkTelegram(ctx, in.Token, in.Receive || in.BindFlow); e != nil {
 			fail(w, 400, e.Error())
 			return
 		}
@@ -148,6 +162,7 @@ func (a *app) telegramSave(w http.ResponseWriter, r *http.Request) {
 	a.tgConfigMu.Lock()
 	defer a.tgConfigMu.Unlock()
 	// Cancel in-flight network requests before waiting for a storage operation.
+	a.botBinding.Clear()
 	a.wakeTelegram()
 	// Share the data gate with uploads; toggling the bot must not wait for a
 	// potentially large web upload. Revision checks fence both import/outbox commits.
@@ -181,58 +196,6 @@ func (a *app) telegramSave(w http.ResponseWriter, r *http.Request) {
 	}
 	a.wakeTelegram()
 	reply(w, 200, map[string]bool{"ok": true})
-}
-
-func (a *app) telegramTest(w http.ResponseWriter, r *http.Request) {
-	if _, ok := a.admin(w, r); !ok {
-		return
-	}
-	var in struct {
-		Token string `json:"token"`
-	}
-	if !decode(w, r, &in) {
-		return
-	}
-	cfg, _, err := a.telegramConfig()
-	if err != nil {
-		fail(w, 500, "配置无法读取")
-		return
-	}
-	if in.Token == "" {
-		in.Token = cfg.Token
-	}
-	if !telegramTokenPattern.MatchString(in.Token) {
-		fail(w, 400, "请填写有效的 Bot Token")
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
-	defer cancel()
-	name, err := a.checkTelegram(ctx, in.Token, true)
-	if err != nil {
-		fail(w, 400, err.Error())
-		return
-	}
-	chats := []string{}
-	if cfg.Enabled && cfg.Token == in.Token {
-		if cfg.ChatID != "" {
-			chats = append(chats, cfg.ChatID)
-		}
-	} else {
-		var updates []telegramUpdate
-		if err = a.telegramCall(ctx, in.Token, "getUpdates", map[string]any{"timeout": 0, "limit": 100, "allowed_updates": []string{"message"}}, &updates); err != nil {
-			fail(w, 502, err.Error())
-			return
-		}
-		seen := map[int64]bool{}
-		for _, update := range updates {
-			m := update.Message
-			if m != nil && m.Chat.Type == "private" && m.Chat.ID > 0 && !m.From.Bot && !seen[m.Chat.ID] {
-				chats = append(chats, strconv.FormatInt(m.Chat.ID, 10))
-				seen[m.Chat.ID] = true
-			}
-		}
-	}
-	reply(w, 200, map[string]any{"username": name, "chats": chats})
 }
 
 func (a *app) telegramRetry(w http.ResponseWriter, r *http.Request) {
@@ -386,11 +349,17 @@ func (a *app) runTelegram(ctx context.Context) {
 		a.tgCancel = cancel
 		a.tgMu.Unlock()
 		var workers sync.WaitGroup
-		if cfg.Receive {
+		a.registerRelayMenu(child, cfg, 0)
+		if cfg.ChatID != "" {
+			if chat, _ := strconv.ParseInt(cfg.ChatID, 10, 64); chat > 0 {
+				a.registerRelayMenu(child, cfg, chat)
+			}
+		}
+		if cfg.Receive || cfg.ChatID == "" || a.botBinding.Pending(rev) {
 			workers.Add(1)
 			go func() { defer workers.Done(); a.receiveTelegram(child, cfg, rev) }()
 		}
-		if cfg.Send {
+		if cfg.Send && cfg.ChatID != "" {
 			workers.Add(1)
 			go func() { defer workers.Done(); a.sendTelegram(child, cfg, rev) }()
 		}
@@ -423,7 +392,8 @@ type telegramMessage struct {
 		Type string `json:"type"`
 	} `json:"chat"`
 	From struct {
-		Bot bool `json:"is_bot"`
+		ID  int64 `json:"id"`
+		Bot bool  `json:"is_bot"`
 	} `json:"from"`
 	Photos    []telegramFile `json:"photo"`
 	Document  *telegramFile  `json:"document"`
@@ -441,7 +411,7 @@ type telegramUpdate struct {
 
 func (a *app) receiveTelegram(ctx context.Context, cfg telegramConfig, rev string) {
 	for ctx.Err() == nil {
-		if _, err := a.findUser(cfg.UserID); err != nil {
+		if _, err := a.findUser(cfg.UserID); cfg.UserID != "" && err != nil {
 			a.telegramStatus(rev, "receive", errors.New("归属账户已过期或不存在，已停止同步"))
 			if !telegramWait(ctx, 30*time.Second) {
 				return
@@ -469,7 +439,11 @@ func (a *app) receiveTelegram(ctx context.Context, cfg telegramConfig, rev strin
 				continue
 			}
 			m := update.Message
-			if m != nil && m.Chat.Type == "private" && strconv.FormatInt(m.Chat.ID, 10) == cfg.ChatID && !m.From.Bot && m.Date >= cfg.Since {
+			if a.acceptRelayBinding(ctx, cfg, rev, m) {
+				return
+			}
+			handled := a.relayBotCommand(ctx, cfg, m)
+			if !handled && cfg.Receive && m != nil && m.Chat.Type == "private" && strconv.FormatInt(m.Chat.ID, 10) == cfg.ChatID && !m.From.Bot && m.Date >= cfg.Since {
 				if err = a.importTelegram(ctx, cfg, rev, update); err != nil {
 					break
 				}

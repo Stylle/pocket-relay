@@ -93,3 +93,9 @@ docker compose -f docker-compose.yml up -d
 ## 维护与验证
 
 格式、共享组件、反向代理与平台验收见 [维护约定](docs/MAINTENANCE.md)。升级前备份完整数据目录及应用密钥，保留原数据卷。
+
+连接／通知测试支持当前表单草稿，无需先保存；测试不保存、不启用配置。详见 [连接与通知测试](docs/integration-tests.md)。
+
+## 通知绑定与连接测试
+
+Telegram 采用「Token → 保存 → 生成绑定码 → 私聊 `/bind`」统一流程，自动注册机器人菜单，无需手填 Chat ID 或发送测试消息。Webhook／飞牛支持直接测试当前表单而不保存。固件仅保留 Webhook／MQTT。详见 [配置说明](docs/integration-tests.md)。

@@ -269,6 +269,7 @@ function logoutLocal() {
   closeOriginal();
   state.privacyRevision = null;
   $("tg-token").value = "";
+  $("tg-command").value = "";$("tg-command-box").hidden=true;telegramExpiry=0;
   state.generation++;
   state.revealed.clear();
   state.loadedImages.clear();
@@ -1199,6 +1200,7 @@ function showTelegramStatus(result) {
   if (result.sent) pieces.push("最近发送 " + date(result.sent * 1000));
   if (result.last_error) pieces.push(result.last_error);
   $("tg-status").textContent = pieces.join(" · ");
+  updateBindingStatus(result);
 }
 async function loadTelegram(prefetched) {
   const generation = state.generation;
@@ -1215,73 +1217,35 @@ async function loadTelegram(prefetched) {
   $("tg-token").placeholder = result.configured
     ? "Token 已加密保存；留空保持不变"
     : "从 @BotFather 获取 Token";
-  $("tg-chat").value = cfg.chat_id || "";
-  $("tg-user").replaceChildren();
-  for (const user of state.admin.users) {
-    const option = node(
-      "option",
-      "",
-      user.name +
-        (user.expires && user.expires * 1000 <= Date.now() ? tr("（已过期）") : ""),
-    );
-    option.value = user.id;
-    $("tg-user").append(option);
-  }
-  $("tg-user").value = cfg.user_id || state.user.id;
-  $("tg-detected").hidden = true;
   showTelegramStatus(result);
 }
-$("telegram-form").onsubmit = async (event) => {
-  event.preventDefault();
-  await action(event.submitter, async () => {
-    await json("/api/admin/telegram", {
-      method: "PUT",
-      body: JSON.stringify({
-        enabled: $("tg-enabled").checked,
-        receive: $("tg-receive").checked,
-        send: $("tg-send").checked,
-        include_concealed: $("tg-private").checked,
-        receive_concealed: $("tg-receive-private").checked,
-        user_id: $("tg-user").value,
-        chat_id: $("tg-chat").value.trim(),
-        token: $("tg-token").value.trim(),
-        revision: telegramRevision,
-      }),
-    });
-    await loadTelegram();
-    toast(tr("机器人设置已保存，已清空旧发送队列"));
-  });
-};
-$("tg-test").onclick = () =>
-  action($("tg-test"), async () => {
-    const result = await json("/api/admin/telegram/test", {
-      method: "POST",
-      body: JSON.stringify({ token: $("tg-token").value.trim() }),
-    });
-    const chats = result.chats || [];
-    $("tg-detected").replaceChildren();
-    const placeholder = uiNode("option", "", "选择要绑定的私聊 ID");
-    placeholder.value = "";
-    $("tg-detected").append(placeholder);
-    for (const id of chats) {
-      const option = node("option", "", id);
-      option.value = id;
-      $("tg-detected").append(option);
-    }
-    $("tg-detected").hidden = !chats.length;
-    if (chats.length === 1) {
-      $("tg-chat").value = chats[0];
-      $("tg-detected").value = chats[0];
-    }
-    $("tg-status").textContent = chats.length
-      ? tr("连接正常，已检测到私聊 ID；请核对后保存。")
-      : tr("连接正常。请在 Telegram 向 @") +
-        (result.username || tr("你的机器人")) +
-        tr(" 发送 /start 后重新检测。启用期间只显示已绑定 ID，修改绑定请先关闭同步。");
-  });
-$("tg-detected").onchange = () => {
-  if ($("tg-detected").value) $("tg-chat").value = $("tg-detected").value;
-};
+let telegramBusy = false, telegramConfigured = false, telegramExpiry = 0;
+function updateBindingStatus(result) {
+ const cfg=result.config||{};telegramConfigured=!!result.configured;
+ if(telegramRevision && telegramRevision!==result.revision){$("tg-command-box").hidden=true;$("tg-command").value="";}
+ telegramRevision=result.revision||"";
+ $("tg-enabled").checked=!!cfg.enabled;
+ $("tg-binding-status").textContent=tr(!result.configured?"尚未保存 Token":!cfg.enabled?"机器人已停用":cfg.chat_id?"已绑定":"已保存，等待绑定");
+ $("tg-unbind").hidden=!cfg.chat_id;$("tg-toggle").textContent=tr(cfg.enabled?"停用机器人":"启用机器人");
+ $("tg-pair").disabled=telegramBusy||!result.configured||!cfg.enabled||!!$("tg-token").value.trim();
+
+}
+async function telegramAction(button,task){
+ if(telegramBusy)return;telegramBusy=true;
+ const controls=[...$("telegram-form").querySelectorAll("button,input")],disabled=controls.map(c=>c.disabled);controls.forEach(c=>c.disabled=true);
+ try{await action(button,task)}finally{controls.forEach((c,i)=>c.disabled=disabled[i]);telegramBusy=false;updateBindingStatus(await json("/api/admin/telegram"));}
+}
+async function saveTelegram(enabled){
+ await json("/api/admin/telegram",{method:"PUT",body:JSON.stringify({enabled,bindFlow:true,receive:$("tg-receive").checked,send:$("tg-send").checked,include_concealed:$("tg-private").checked,receive_concealed:$("tg-receive-private").checked,token:$("tg-token").value.trim(),revision:telegramRevision})});
+ $("tg-command-box").hidden=true;$("tg-command").value="";await loadTelegram();toast(tr("保存成功"));
+}
+$("telegram-form").onsubmit=event=>{event.preventDefault();telegramAction(event.submitter,()=>saveTelegram(true));};
+$("tg-token").oninput=()=>{$("tg-pair").disabled=telegramBusy||!telegramConfigured||!$("tg-enabled").checked||!!$("tg-token").value.trim();};
+$("tg-toggle").onclick=()=>telegramAction($("tg-toggle"),()=>saveTelegram(!$("tg-enabled").checked));
+$("tg-pair").onclick=()=>telegramAction($("tg-pair"),async()=>{const result=await json("/api/admin/telegram/pair",{method:"POST"});$("tg-command").value=result.command;telegramExpiry=Date.now()+result.expiresIn*1000;$("tg-command-box").hidden=false;});
+$("tg-unbind").onclick=()=>telegramAction($("tg-unbind"),async()=>{await json("/api/admin/telegram/unbind",{method:"POST"});await loadTelegram();});
+$("tg-command").onfocus=()=>$("tg-command").select();
+setInterval(()=>{if(telegramExpiry&&Date.now()>=telegramExpiry){$("tg-command-box").hidden=true;$("tg-command").value="";telegramExpiry=0;}},1000);
 $("tg-retry").onclick = () =>
   action($("tg-retry"), async () => {
     await json("/api/admin/telegram/retry", { method: "POST" });

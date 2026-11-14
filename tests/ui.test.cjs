@@ -181,6 +181,7 @@ function fixture(
   w.eval(fs.readFileSync("web/session.js", "utf8"));
   w.eval(fs.readFileSync("web/message-text.js", "utf8"));
   w.eval(fs.readFileSync("web/api.js", "utf8"));
+  w.eval(fs.readFileSync("web/draft-test.js", "utf8"));
   w.eval(
     script +
       "\nwindow.__test={state,setView,refresh,renderMessages,renderAttachments,browserSession,recordActivity,flushActivity,expireSession};",
@@ -432,7 +433,7 @@ test("static UI contracts include viewport, narrow-screen layout and no external
     );
 });
 
-test("Telegram controls default off, identify chat and independently save directions", async (t) => {
+test("Telegram saves Token before generating binding code and preserves directions", async (t) => {
   const f = fixture(t);
   await settle();
   await login(f);
@@ -440,9 +441,9 @@ test("Telegram controls default off, identify chat and independently save direct
   assert.equal(f.$("tg-enabled").checked, false);
   assert.equal(f.$("tg-private").checked, false);
   f.$("tg-token").value = "test-only-token";
-  f.$("tg-test").click();
-  await settle();
-  assert.equal(f.$("tg-chat").value, "42");
+  assert.equal(f.$("tg-test"), null);
+  assert.equal(f.$("tg-chat"), null);
+  assert.equal(f.$("tg-pair").disabled,true);
   assert.equal(f.$("tg-enabled").checked, false);
   f.$("tg-enabled").checked = true;
   f.$("tg-send").checked = false;
@@ -462,8 +463,9 @@ test("Telegram controls default off, identify chat and independently save direct
   assert.equal(body.receive, true);
   assert.equal(body.send, false);
   assert.equal(body.include_concealed, false);
-  assert.equal(body.user_id, "owner");
-  assert.equal(body.chat_id, "42");
+  assert.equal(body.bindFlow, true);
+  assert.equal(body.chat_id, undefined);
+  assert.equal(body.user_id, undefined);
   assert.equal(body.revision, "test-revision");
   assert.equal(f.$("tg-token").value, "");
   assert.equal(f.w.localStorage.getItem("pr-token"), null);

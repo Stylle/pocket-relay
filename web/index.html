@@ -11,10 +11,11 @@
     <title>随手传 · Pocket Relay</title>
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/style.css" /><link rel="stylesheet" href="/binding-panel.css" />
     <script src="/session.js" defer></script>
     <script src="/message-text.js" defer></script>
     <script src="/api.js" defer></script>
+    <script src="/draft-test.js" defer></script>
     <script src="/app.js" defer></script>
   <link rel="stylesheet" href="/design-system.css"><script src="/ui-i18n.js"></script><script src="/appearance.js"></script></head>
   <body>
@@ -351,74 +352,21 @@
             </p>
             <div class="form-actions-sticky"><button data-i18n="保存设置" class="primary">保存设置</button></div>
           </form>
-          <form id="telegram-form" class="settings-card">
-            <h3 data-i18n="Telegram 机器人">Telegram 机器人</h3>
-            <p data-i18n="默认关闭；一个专用机器人绑定一个站内账户和一个 Telegram 私聊。无需公网回调。" class="muted small">
-              默认关闭；一个专用机器人绑定一个站内账户和一个 Telegram
-              私聊。无需公网回调。
-            </p>
-            <label class="check"
-              ><input id="tg-enabled" type="checkbox" /><span data-i18n="开启 Telegram 同步">开启 Telegram
-              同步</span></label
-            >
-            <div class="form-grid">
-              <label><span data-i18n="归属账户">归属账户</span><select id="tg-user"></select></label>
-              <label
-                ><span data-i18n="私聊 Chat ID">私聊 Chat ID</span><input
-                  id="tg-chat"
-                  inputmode="numeric"
-                  placeholder="先向自己的机器人发送 /start，再点击检测" data-i18n-placeholder="先向自己的机器人发送 /start，再点击检测"
-              /></label>
-            </div>
-            <label
-              >Bot Token<input
-                id="tg-token"
-                type="password"
-                autocomplete="new-password"
-                placeholder="从 @BotFather 获取；已保存后留空表示不修改" data-i18n-placeholder="从 @BotFather 获取；已保存后留空表示不修改"
-            /></label>
-            <div class="button-row">
-              <button data-i18n="检测连接 / 识别私聊 ID" id="tg-test" type="button" class="secondary">
-                检测连接 / 识别私聊 ID</button
-              ><select
-                id="tg-detected"
-                aria-label="检测到的私聊"
-                hidden
-              ></select>
-            </div>
-            <label class="check"
-              ><input id="tg-receive" type="checkbox" checked /><span data-i18n="接收 TG 消息到网站">接收 TG
-              消息到网站</span></label
-            >
-            <label class="check"
-              ><input id="tg-receive-private" type="checkbox" checked /><span data-i18n="收到的 TG 消息默认设为隐私（含图片与附件）">收到的
-              TG 消息默认设为隐私（含图片与附件）</span></label
-            >
-            <label class="check"
-              ><input id="tg-send" type="checkbox" checked /><span data-i18n="网站新消息发送到 TG">网站新消息发送到
-              TG</span></label
-            >
-            <label class="check"
-              ><input
-                id="tg-private"
-                type="checkbox"
-              /><span data-i18n="同时转发隐私遮挡消息（含正文与附件）">同时转发隐私遮挡消息（含正文与附件）</span></label
-            >
-            <p data-i18n="开启发送意味着将消息交给 Telegram 保存。网页删除、到期或遮挡不会删除 TG 副本；该同步不是端到端加密。普通接口接收附件最多 20 MB，发送附件最多 50 MB。切换配置会清空旧发送队列，不补发网站历史。仅限自用私聊，不接收其他用户或群聊信息。" class="warning">
-              开启发送意味着将消息交给 Telegram
-              保存。网页删除、到期或遮挡不会删除 TG
-              副本；该同步不是端到端加密。普通接口接收附件最多 20
-              MB，发送附件最多 50
-              MB。切换配置会清空旧发送队列，不补发网站历史。仅限自用私聊，不接收其他用户或群聊信息。
-            </p>
-            <div class="button-row">
-              <button data-i18n="保存机器人设置" class="primary">保存机器人设置</button
-              ><button data-i18n="重试失败发送" id="tg-retry" class="secondary" type="button">
-                重试失败发送
-              </button>
-            </div>
-            <p data-i18n="尚未开启" id="tg-status" class="muted small" role="status">尚未开启</p>
-          </form>
+          <form id="telegram-form" class="settings-card bot-binding-card">
+<h2 data-i18n="Telegram 机器人">Telegram 机器人</h2>
+<p class="muted" data-i18n="填写 Token 并保存，生成绑定码后，在机器人私聊中发送完整的 /bind 指令即可。">填写 Token 并保存，生成绑定码后，在机器人私聊中发送完整的 /bind 指令即可。</p>
+<label>Bot Token<input id="tg-token" type="password" autocomplete="new-password" spellcheck="false" /></label>
+<div class="binding-actions"><button class="primary" data-i18n="保存设置">保存设置</button><button id="tg-pair" type="button" data-i18n="生成绑定码">生成绑定码</button><button id="tg-unbind" class="ghost" type="button" hidden data-i18n="解除绑定">解除绑定</button></div>
+<p id="tg-binding-status" class="binding-status" role="status"></p>
+<div id="tg-command-box" class="binding-command" hidden><label for="tg-command" data-i18n="在 Telegram 私聊发送以下完整指令">在 Telegram 私聊发送以下完整指令</label><input id="tg-command" readonly autocomplete="off" spellcheck="false" /><p class="muted" data-i18n="绑定码五分钟有效、仅可使用一次。请勿分享，重新生成会使旧码失效。">绑定码五分钟有效、仅可使用一次。请勿分享，重新生成会使旧码失效。</p></div>
+<details><summary data-i18n="更多设置">更多设置</summary><input id="tg-enabled" type="checkbox" hidden /><button id="tg-toggle" type="button" class="ghost">停用机器人</button>
+<label class="check"><input id="tg-receive" type="checkbox" checked /><span data-i18n="接收 TG 消息到网站">接收 TG 消息到网站</span></label>
+<label class="check"><input id="tg-receive-private" type="checkbox" checked /><span data-i18n="收到的 TG 消息默认设为隐私（含图片与附件）">收到的 TG 消息默认设为隐私（含图片与附件）</span></label>
+<label class="check"><input id="tg-send" type="checkbox" checked /><span data-i18n="网站新消息发送到 TG">网站新消息发送到 TG</span></label>
+<label class="check"><input id="tg-private" type="checkbox" /><span data-i18n="同时转发隐私遮挡消息（含正文与附件）">同时转发隐私遮挡消息（含正文与附件）</span></label>
+<p class="warning">开启发送后 Telegram 会保存消息副本；网页删除或到期不会删除该副本。附件接收最多 20 MB、发送最多 50 MB。仅同步绑定私聊，不补发历史消息。</p>
+<button id="tg-retry" class="secondary" type="button" data-i18n="重试失败发送">重试失败发送</button><p id="tg-status" class="muted small" role="status"></p>
+</details></form>
           <form id="storage-form" class="settings-card">
             <h3 data-i18n="添加远程存储">添加远程存储</h3>
             <div class="form-grid">
