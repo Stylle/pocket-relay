@@ -257,6 +257,7 @@ $("auth-form").onsubmit = async (e) => {
     await enterWorkspace(result);
   } catch (err) {
     $("auth-error").textContent = err.message;
+    if (err.status === 401) { $("code").value = ""; $("code").focus(); }
   } finally {
     b.disabled = false;
   }
@@ -1446,7 +1447,7 @@ async function flushActivity() {
   }
 }
 function recordActivity(event) {
-  if (!event.isTrusted || document.hidden || !state.token) return;
+  if (booting || !event.isTrusted || document.hidden || !state.token) return;
   if (browserSession.expired()) {
     expireSession();
     return;
@@ -1466,11 +1467,12 @@ for (const type of [
 ])
   document.addEventListener(type, recordActivity, { passive: true });
 setInterval(() => {
-  if (state.token && browserSession.expired()) expireSession();
+  if (!booting && state.token && browserSession.expired()) expireSession();
 }, 1000);
 let policySyncBusy = false;
 async function syncSessionPolicy() {
   if (
+    booting ||
     !state.token ||
     document.hidden ||
     activityPending ||
@@ -1492,6 +1494,7 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) syncSessionPolicy();
 });
 window.addEventListener("pageshow", (event) => {
+  if (booting) return;
   if (event.persisted && state.token && !browserSession.remembered)
     expireSession("页面已重新打开，请重新验证");
   else if (event.persisted && state.token) syncSessionPolicy();

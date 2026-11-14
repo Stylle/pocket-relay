@@ -363,7 +363,11 @@ func (a *app) login(w http.ResponseWriter, r *http.Request) {
 	}
 	step, ok := verifyTOTP(secret, in.Code, last)
 	if !ok {
-		fail(w, 401, "验证码不正确或已使用，请等待下一个验证码")
+		if _, reused := verifyTOTP(secret, in.Code, -1); reused {
+			fail(w, 401, "这组验证码已使用，请等待验证器生成下一组验证码")
+		} else {
+			fail(w, 401, "验证码不正确，请检查验证器与设备时间是否同步")
+		}
 		return
 	}
 	result, e := a.db.Exec(`UPDATE users SET last_step=? WHERE id=? AND last_step<?`, step, u.ID, step)

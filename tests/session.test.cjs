@@ -31,3 +31,11 @@ test('remembered login ignores idle but has a fixed absolute deadline',()=>{
  now+=86400000;assert.equal(s.expired(),true);assert.equal(s.input(),false);
  s.clear();assert.equal(s.remembered,false);assert.equal(s.expiresAt,0);
 });
+
+test('restored token waits for server validation before applying expiry policy',()=>{
+ let now=Date.now();const store=storage();store.setItem('pr-session',JSON.stringify({token:'fixture'}));
+ const s=new Session(store,'reload',()=>now);assert.equal(s.restore(),'fixture');
+ now+=120000;assert.equal(s.expired(),false);assert.equal(s.input(),false);
+ s.accept('fixture',{remembered:true,idle_minutes:0,expires_at:now+86400000,server_time:now});
+ assert.equal(s.validating,false);assert.equal(s.expired(),false);now+=86400000;assert.equal(s.expired(),true);
+});

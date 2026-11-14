@@ -132,3 +132,26 @@ func TestUncheckingRememberClearsPreviousBrowserGrant(t *testing.T) {
 	}
 	readJSON(t, rememberedRequest(a, cookie, "/api/session/restore", "", true), 401)
 }
+
+func TestReusedOTPDoesNotRevokeRememberedGrant(t *testing.T) {
+	a := testApp(t)
+	_, _, secret := register(t, a, "owner")
+	code := totp(secret, now()/30+1)
+	w := req(a, "POST", "/api/login", "", map[string]any{"name": "owner", "code": code, "remember": true})
+	readJSON(t, w, 200)
+	var cookie *http.Cookie
+	for _, c := range w.Result().Cookies() {
+		if c.Name == rememberCookie {
+			cookie = c
+		}
+	}
+	duplicate := req(a, "POST", "/api/login", "", map[string]any{"name": "owner", "code": code, "remember": true})
+	if duplicate.Code != 401 || !strings.Contains(duplicate.Body.String(), "已使用") {
+		t.Fatal("reused code not identified")
+	}
+	wrong := req(a, "POST", "/api/login", "", map[string]any{"name": "owner", "code": "invalid", "remember": true})
+	if wrong.Code != 401 || !strings.Contains(wrong.Body.String(), "不正确") {
+		t.Fatal("invalid code not identified")
+	}
+	readJSON(t, rememberedRequest(a, cookie, "/api/session/restore", "", true), 200)
+}
