@@ -3,6 +3,7 @@ const tr = text => window.AppI18n ? window.AppI18n.t(text) : text;
 function uiNode(tag,cls,key){const el=node(tag,cls,key);if(window.AppI18n)window.AppI18n.bind(el,key);return el}
 "use strict";
 const $ = (id) => document.getElementById(id);
+let rotationID = "";
 const state = {
   token: "",
   user: null,
@@ -261,6 +262,7 @@ $("auth-form").onsubmit = async (e) => {
   }
 };
 function logoutLocal() {
+  resetRotation();
   cancelMessageRequest();
   renderedRows.clear();
   closeSearch();
@@ -348,10 +350,13 @@ async function setView(view) {
     all: tr("全部信息"),
     files: tr("文件信息"),
     settings: tr("设备设置"),
+    account: tr("账号安全"),
     admin: tr("管理后台"),
   }[view]);
   $("messages-view").hidden = !["messages", "today", "all", "files"].includes(view);
   $("settings-view").hidden = view !== "settings";
+  $("account-view").hidden = view !== "account";
+  if (view !== "account") resetRotation();
   $("admin-view").hidden = view !== "admin";
   $("composer").hidden = !["messages", "today", "all", "files"].includes(view);
   if (view === "admin") await loadAdmin();
@@ -896,7 +901,7 @@ async function refresh() {
     if (generation !== state.generation) return;
     if (response.status === 304) {
       $("sync-state").classList.remove("offline");
-      $("sync-state").lastChild.textContent = tr("已同步");
+      setSyncStatus(true);
       return;
     }
     state.etag = response.headers.get("ETag") || "";
@@ -949,13 +954,13 @@ async function refresh() {
       renderMessages();
     }
     $("sync-state").classList.remove("offline");
-    $("sync-state").lastChild.textContent = tr("已同步");
+    setSyncStatus(true);
   } catch (e) {
     if (generation !== state.generation || !state.token || controller.signal.aborted) return;
     $("timeline").setAttribute("aria-busy", "false");
     if (!state.signature) $("timeline").replaceChildren(uiNode("p","muted small","连接服务失败，请刷新重试。"));
     $("sync-state").classList.add("offline");
-    $("sync-state").lastChild.textContent = tr("连接中断");
+    setSyncStatus(false);
   } finally {
     if (generation === state.generation) state.polling = false;
     if (messageRequest === controller) messageRequest = null;
@@ -1612,3 +1617,30 @@ window.addEventListener("pageshow", (event) => {
 });
 
 boot();
+
+function setSyncStatus(online) {
+  const status = $("sync-state"), text = tr(online ? "已同步" : "连接中断");
+  status.title = text; status.setAttribute("aria-label", text); status.lastChild.textContent = text;
+}
+
+function resetRotation() {
+  rotationID = ""; $("rotation-qr").removeAttribute("src"); $("rotation-secret").textContent = "";
+  $("rotation-current").value = $("rotation-code").value = "";
+  $("rotation-start").hidden = false; $("rotation-pending").hidden = true; $("rotation-cancel").hidden = true;
+  $("rotation-current").required = true; $("rotation-code").required = false;
+  uiText($("rotation-submit"), tr("验证并继续"));
+}
+$("authenticator-form").onsubmit = event => {
+  event.preventDefault();
+  action($("rotation-submit"), async () => {
+    const result = await json("/api/account/authenticator", {method:"POST",body:JSON.stringify({action:rotationID ? "confirm" : "begin",enrollment:rotationID,code:$(rotationID ? "rotation-code" : "rotation-current").value})});
+    if (rotationID) { logoutLocal(); toast(tr("验证器已更换，请等待下一组新验证码后重新登录。")); return; }
+    rotationID = result.enrollment; $("rotation-qr").src = result.qr; $("rotation-secret").textContent = result.secret;
+    $("rotation-current").value = ""; $("rotation-current").required = false; $("rotation-code").required = true;
+    $("rotation-start").hidden = true; $("rotation-pending").hidden = false; $("rotation-cancel").hidden = false;
+    uiText($("rotation-submit"),tr("确认绑定")); $("rotation-code").focus();
+  });
+};
+$("rotation-cancel").onclick = () => action($("rotation-cancel"), async () => {
+  await json("/api/account/authenticator",{method:"POST",body:JSON.stringify({action:"cancel"})}); resetRotation();
+});

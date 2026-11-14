@@ -28,7 +28,7 @@ import (
 //go:embed web/*
 var assets embed.FS
 
-const version = "0.7.2"
+const version = "0.8.0"
 
 type user struct {
 	ID      string `json:"id"`
@@ -56,14 +56,15 @@ type bucket struct {
 	Until time.Time
 }
 type app struct {
-	db       *sql.DB
-	dir      string
-	key      []byte
-	mu       sync.Mutex
-	sessions map[string]session
-	pending  map[string]enrollment
-	tickets  map[string]ticket
-	attempts map[string]bucket
+	db        *sql.DB
+	dir       string
+	key       []byte
+	mu        sync.Mutex
+	sessions  map[string]session
+	pending   map[string]enrollment
+	rotations map[string]authenticatorRotation
+	tickets   map[string]ticket
+	attempts  map[string]bucket
 	// Serialize backup/restore and writes, not normal reads or streamed downloads.
 	gate        sync.RWMutex
 	restart     chan struct{}
@@ -276,6 +277,7 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("POST /api/session/restore", a.restoreRemembered)
 	mux.HandleFunc("POST /api/session/activity", a.sessionActivity)
 	mux.HandleFunc("POST /api/logout", a.logout)
+	mux.HandleFunc("POST /api/account/authenticator", a.rotateAuthenticator)
 	mux.HandleFunc("GET /api/messages", a.listMessages)
 	mux.HandleFunc("POST /api/messages", a.sendMessage)
 	mux.HandleFunc("GET /api/messages/{id}/text", a.messageText)
