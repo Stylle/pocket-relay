@@ -7,3 +7,5 @@
 @media(max-width:700px){.bot-binding-card{padding:18px}.bot-binding-card .binding-actions button{min-height:40px}.binding-command{padding:0 12px 8px}}
 
 .bot-binding-card .telegram-section{border-top:1px solid var(--border);margin-top:24px;padding-top:20px}.bot-binding-card .check-row{display:flex;align-items:center;gap:8px}.bot-binding-card .check-row input{width:16px;height:16px}.telegram-commands{display:grid;grid-template-columns:max-content 1fr;gap:12px 20px;font-size:13px}.telegram-commands dd{margin:0;color:var(--muted)}
+
+.bot-binding-card>label.check{display:flex;align-items:center;gap:8px}.bot-binding-card>label.check input{width:16px;height:16px;flex-shrink:0}

@@ -29,7 +29,7 @@ import (
 //go:embed web/*
 var assets embed.FS
 
-const version = "0.9.1"
+const version = "0.9.2"
 
 type user struct {
 	ID      string `json:"id"`

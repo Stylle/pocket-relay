@@ -365,8 +365,9 @@
 <div class="binding-actions"><button class="primary" data-i18n="保存设置">保存设置</button></div>
 <section class="telegram-section"><h3 data-i18n="连接与账户绑定">连接与账户绑定</h3>
 <p id="tg-binding-status" class="binding-status" role="status"></p>
+<div class="binding-actions"><button id="tg-pair" type="button" class="primary" data-i18n="生成我的绑定码">生成我的绑定码</button><button id="tg-unbind" type="button" class="ghost" hidden data-i18n="解除绑定">解除绑定</button></div>
 <div id="tg-command-box" class="binding-command" hidden><label for="tg-command" data-i18n="在 Telegram 私聊发送以下完整指令">在 Telegram 私聊发送以下完整指令</label><input id="tg-command" readonly autocomplete="off" spellcheck="false" /><p class="muted" data-i18n="绑定码五分钟有效、仅可使用一次。请勿分享，重新生成会使旧码失效。">绑定码五分钟有效、仅可使用一次。请勿分享，重新生成会使旧码失效。</p></div>
-<div class="binding-actions"><button id="tg-pair" type="button" data-i18n="生成我的绑定码">生成我的绑定码</button><button id="tg-unbind" type="button" class="ghost" hidden data-i18n="解除绑定">解除绑定</button></div>
+
 <button id="tg-retry" type="button" class="secondary" data-i18n="重试失败发送">重试失败发送</button><p id="tg-status" class="muted small" role="status"></p></section>
 <section class="telegram-section"><h3 data-i18n="机器人指令">机器人指令</h3><dl class="telegram-commands"><dt><code>/help</code></dt><dd>消息同步帮助</dd><dt><code>/bind 绑定码</code></dt><dd>绑定当前网站账户</dd></dl></section></form>
           <form id="storage-form" class="settings-card">
