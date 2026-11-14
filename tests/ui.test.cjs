@@ -403,9 +403,9 @@ test("admin settings are editable without sending a message first", async (t) =>
   await login(f);
   await f.w.__test.setView("admin");
   assert.equal(f.$("admin-view").hidden, false);
-  assert.equal(f.$("active-store").value, "local");
-  f.$("guest-hours").value = "6";
-  f.$("public-registration").checked = true;
+  assert.equal(f.$("active-store"), null);
+  assert.equal(f.$("guest-hours"), null);
+  assert.equal(f.$("public-registration"), null);
   f.$("admin-form").dispatchEvent(
     new f.w.SubmitEvent("submit", {
       cancelable: true,
@@ -417,8 +417,8 @@ test("admin settings are editable without sending a message first", async (t) =>
     (c) => c.path === "/api/admin" && c.opts.method === "PUT",
   );
   assert.ok(call);
-  assert.equal(JSON.parse(call.opts.body).guest_hours, 6);
-  assert.equal(JSON.parse(call.opts.body).public_registration, true);
+  assert.equal(JSON.parse(call.opts.body).guest_hours, 1);
+  assert.equal(JSON.parse(call.opts.body).public_registration, false);
 });
 test("static UI contracts include viewport, narrow-screen layout and no external dependencies", () => {
   assert.match(html, /name="viewport"/);
@@ -973,4 +973,15 @@ test("polling preserves unchanged message rows and media rather than rebuilding 
  await f.w.__test.refresh();
  assert.equal(f.$("timeline").querySelector(".message"),first);
  assert.equal(f.$("timeline").querySelectorAll(".message").length,2);
+});
+
+test("restore uses one confirmation dialog and cancellation sends no request",async(t)=>{
+ const f=fixture(t);await settle();await login(f);await f.w.__test.setView("admin");
+ assert.equal(f.$("restore-confirm"),null);
+ const file=new f.w.File(["fixture"],"backup.prb");Object.defineProperty(f.$("restore-file"),"files",{value:[file]});
+ f.$("restore-file").dispatchEvent(new f.w.Event("change"));f.$("backup-password").value="fixture-password";
+ f.w.confirm=()=>false;f.$("restore-start").click();await settle();
+ assert.equal(f.calls.filter(c=>c.path==="/api/admin/restore").length,0);
+ f.w.confirm=()=>true;f.$("restore-start").click();await settle();
+ assert.equal(f.calls.filter(c=>c.path==="/api/admin/restore").length,1);
 });

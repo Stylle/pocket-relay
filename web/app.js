@@ -1276,10 +1276,8 @@ async function loadAdmin() {
   await loadTelegram(telegram);
   if (generation !== state.generation || !state.user) return;
   const s = state.admin.settings;
-  $("public-registration").checked = s.public_registration;
   $("auto-load-images").checked = s.auto_load_images !== false;
   $("message-size").value = s.message_size || "medium";
-  $("guest-hours").value = s.guest_hours;
   const idle = s.session_idle_minutes ?? 15;
   $("idle-unit").value =
     idle === 0 ? "never" : idle % 1440 === 0 ? "days" : "minutes";
@@ -1290,66 +1288,18 @@ async function loadAdmin() {
   $("max-mb").value = s.max_file_mb;
   $("quota-mb").value = s.quota_mb;
   $("device-template").value = s.device_template;
-  $("active-store").replaceChildren();
-  for (const store of state.admin.stores) {
-    const option = node("option", "", store.name + " · " + store.kind);
-    option.value = store.id;
-    $("active-store").append(option);
-  }
-  $("active-store").value = s.active_store;
-  const list = $("users-list");
-  list.replaceChildren();
-  for (const u of state.admin.users) {
-    const row = node("div", "user-row");
-    const info = node("div");
-    info.append(
-      node("strong", "", u.name),
-      node(
-        "small",
-        "",
-        u.admin
-          ? tr("永久管理员")
-          : (u.expires * 1000 < Date.now() ? tr("已过期 · ") : tr("有效至 ")) +
-              date(u.expires * 1000),
-      ),
-    );
-    row.append(info);
-    if (!u.admin)
-      row.append(
-        button(
-          tr("延长有效期"),
-          async () => {
-            const hours = prompt("从现在起有效多少小时？", "1");
-            if (hours === null) return;
-            if (
-              !/^\d+$/.test(hours) ||
-              Number(hours) < 1 ||
-              Number(hours) > 8760
-            )
-              throw Error("请输入 1–8760 小时");
-            await json("/api/admin/users/" + u.id, {
-              method: "PUT",
-              body: JSON.stringify({ hours: Number(hours) }),
-            });
-            await loadAdmin();
-            toast(tr("已更新有效期"));
-          },
-          "secondary",
-        ),
-      );
-    list.append(row);
-  }
 }
+
 $("admin-form").onsubmit = async (e) => {
   e.preventDefault();
   await action(e.submitter, async () => {
     await json("/api/admin", {
       method: "PUT",
       body: JSON.stringify({
-        public_registration: $("public-registration").checked,
+        public_registration: false,
         auto_load_images: $("auto-load-images").checked,
         message_size: $("message-size").value,
-        guest_hours: Number($("guest-hours").value),
+        guest_hours: 1,
         session_idle_minutes:
           $("idle-unit").value === "never"
             ? 0
@@ -1358,7 +1308,7 @@ $("admin-form").onsubmit = async (e) => {
         max_file_mb: Number($("max-mb").value),
         quota_mb: Number($("quota-mb").value),
         device_template: $("device-template").value,
-        active_store: $("active-store").value,
+        active_store: "local",
       }),
     });
     browserSession.accept(state.token, await json("/api/session"));
@@ -1369,37 +1319,6 @@ $("admin-form").onsubmit = async (e) => {
 $("idle-unit").onchange = () => {
   $("idle-value").disabled = $("idle-unit").value === "never";
   $("idle-value").max = $("idle-unit").value === "days" ? "3650" : "5256000";
-};
-function storeInput() {
-  return {
-    kind: $("storage-kind").value,
-    name: $("storage-name").value,
-    url: $("storage-url").value.trim(),
-    root: $("storage-root").value.trim(),
-    user: $("storage-user").value,
-    password: $("storage-password").value,
-    domain: $("storage-domain").value,
-  };
-}
-$("storage-test").onclick = () =>
-  action($("storage-test"), async () => {
-    await json("/api/admin/storage/test", {
-      method: "POST",
-      body: JSON.stringify(storeInput()),
-    });
-    toast(tr("读写测试通过"));
-  });
-$("storage-form").onsubmit = async (e) => {
-  e.preventDefault();
-  await action(e.submitter, async () => {
-    await json("/api/admin/storage", {
-      method: "POST",
-      body: JSON.stringify(storeInput()),
-    });
-    $("storage-password").value = "";
-    await loadAdmin();
-    toast(tr("存储已添加，请在上方选择并保存为新文件存储位置"));
-  });
 };
 $("backup").onclick = () =>
   action($("backup"), async () => {
@@ -1453,10 +1372,9 @@ $("backup").onclick = () =>
   });
 let selectedBackup = null, restoreBusy = false;
 $("restore-choose").onclick = () => $("restore-file").click();
-$("restore-confirm").onchange = () => { $("restore-start").disabled = !selectedBackup || !$("restore-confirm").checked || restoreBusy; };
 $("restore-file").onchange = () => {
  selectedBackup = $("restore-file").files[0] || null; $("restore-file").value = "";
- $("restore-confirm").checked = false; $("restore-start").disabled = true;
+ $("restore-start").disabled = !selectedBackup;
  const label = $("restore-name");
  label.removeAttribute("data-i18n");label.removeAttribute("data-ui-key");
  label.textContent = selectedBackup ? selectedBackup.name + " · " + size(selectedBackup.size) : tr("尚未选择备份包");
@@ -1464,12 +1382,13 @@ $("restore-file").onchange = () => {
 };
 $("restore-start").onclick = async () => {
   const file = selectedBackup;
-  if (!file || !$("restore-confirm").checked || restoreBusy) return;
+  if (!file || restoreBusy) return;
   const password = $("backup-password").value;
   if (password.length < 12) {
     toast(tr("请先填写此备份的密码"), true);
     return;
   }
+  if(!confirm(tr("恢复将替换当前消息、附件、设置与登录凭据，并重新启动。确定继续？")))return;
   restoreBusy = true; $("restore-start").disabled = true; $("restore-choose").disabled = true; $("backup").disabled = true;
   $("backup-progress").textContent = tr("正在上传并验证备份，请勿关闭页面…");
   try {
@@ -1488,7 +1407,7 @@ $("restore-start").onclick = async () => {
   } catch (e) {
     $("backup-progress").textContent = tr("恢复未完成，原有数据未替换。");
     toast(e.message, true);
-  } finally { restoreBusy = false; $("restore-choose").disabled = false; $("backup").disabled = false; $("restore-start").disabled = !selectedBackup || !$("restore-confirm").checked; }
+  } finally { restoreBusy = false; $("restore-choose").disabled = false; $("backup").disabled = false; $("restore-start").disabled = !selectedBackup; }
 };
 
 function expireSession(

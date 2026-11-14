@@ -31,6 +31,10 @@ func (a *app) adminGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s := a.config()
+	if a.personal {
+		reply(w, 200, map[string]any{"settings": s})
+		return
+	}
 	stores := []store{{ID: "local", Kind: "local", Name: "本地 data/blobs"}}
 	rows, e := a.db.Query(`SELECT value FROM stores`)
 	if e != nil {
@@ -77,6 +81,11 @@ func (a *app) adminSave(w http.ResponseWriter, r *http.Request) {
 	previousIdle := s.SessionIdleMinutes
 	if !decode(w, r, &s) {
 		return
+	}
+	if a.personal {
+		s.Public = false
+		s.ActiveStore = "local"
+		s.GuestHours = 1
 	}
 	if !validateSettings(s) {
 		fail(w, 400, "配置超出范围；空闲超时为 0–5256000 分钟（0 不超时），访客 1–8760 小时、文件 1–10240 MB、配额不小于文件大小，模板须包含 {device}")

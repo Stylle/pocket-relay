@@ -91,9 +91,9 @@
               ><input id="remember-login" type="checkbox" /><span data-i18n="记住登录状态（7 天）">记住登录状态（7
               天）</span></label
             >
-            <p data-i18n="仅在自己的设备勾选。7 天内重新打开网页无需验证，主动退出立即失效；临时账户到期仍需重新验证。" class="small muted">
+            <p data-i18n="仅在自己的设备勾选。7 天内重新打开网页无需验证，主动退出立即失效。" class="small muted">
               仅在自己的设备勾选。7
-              天内重新打开网页无需验证，主动退出立即失效；临时账户到期仍需重新验证。
+              天内重新打开网页无需验证，主动退出立即失效。
             </p>
             <button id="auth-submit" class="primary wide" type="submit">
               <span data-i18n="进入我的空间">进入我的空间</span> <span>→</span>
@@ -267,22 +267,10 @@
             <p data-i18n="所有部署选项都在这里，Compose 只需挂载 data。" class="muted">所有部署选项都在这里，Compose 只需挂载 data。</p>
           </div>
           <form id="admin-form" class="settings-card">
-            <h3 data-i18n="账户与容量">账户与容量</h3>
-            <label class="check"
-              ><input
-                id="public-registration"
-                type="checkbox"
-              /><span data-i18n="允许公开注册临时账户">允许公开注册临时账户</span></label
-            >
+            <h3 data-i18n="容量与显示">容量与显示</h3>
+
             <div class="form-grid">
               <label
-                ><span data-i18n="新账户有效期（小时）">新账户有效期（小时）</span><input
-                  id="guest-hours"
-                  type="number"
-                  min="1"
-                  max="8760"
-                  required /></label
-              ><label
                 ><span data-i18n="单文件上限（MB）">单文件上限（MB）</span><input
                   id="max-mb"
                   type="number"
@@ -290,13 +278,13 @@
                   max="10240"
                   required /></label
               ><label
-                ><span data-i18n="每账户配额（MB）">每账户配额（MB）</span><input
+                ><span data-i18n="存储配额（MB）">存储配额（MB）</span><input
                   id="quota-mb"
                   type="number"
                   min="1"
                   max="1048576"
                   required /></label
-              ><label><span data-i18n="新文件存储位置">新文件存储位置</span><select id="active-store"></select></label>
+              >
             </div>
             <div class="form-grid">
               <label
@@ -315,10 +303,10 @@
                 </select></label
               >
             </div>
-            <p data-i18n="默认 15 分钟；后台同步不算操作。此策略仅作用于未勾选「记住登录状态」的会话。勾选后固定 7 天有效，不受空闲超时影响；主动退出或临时账户到期仍立即失效。" class="muted small">
+            <p data-i18n="默认 15 分钟；后台同步不算操作。此策略仅作用于未勾选「记住登录状态」的会话。勾选后固定 7 天有效，不受空闲超时影响；主动退出立即失效。" class="muted small">
               默认 15
               分钟；后台同步不算操作。此策略仅作用于未勾选「记住登录状态」的会话。勾选后固定
-              7 天有效，不受空闲超时影响；主动退出或临时账户到期仍立即失效。
+              7 天有效，不受空闲超时影响；主动退出立即失效。
             </p>
             <label
               ><span data-i18n="消息来源显示模板">消息来源显示模板</span><input
@@ -326,9 +314,9 @@
                 placeholder="{device} · {ip}"
                 required
             /></label>
-            <p data-i18n="{device} 为设备名，{ip} 为脱敏 IP。切换存储只影响新上传文件，原文件仍保留在原位置。" class="muted small">
+            <p data-i18n="{device} 为设备名，{ip} 为脱敏 IP。附件保存在本地数据目录。" class="muted small">
               {device} 为设备名，{ip} 为脱敏
-              IP。切换存储只影响新上传文件，原文件仍保留在原位置。
+              IP。附件保存在本地数据目录。
             </p>
             <label class="check"
               ><input
@@ -357,11 +345,6 @@
 <p class="muted" data-i18n="填写 Token 并保存，生成绑定码后，在机器人私聊中发送完整的 /bind 指令即可。">填写 Token 并保存，生成绑定码后，在机器人私聊中发送完整的 /bind 指令即可。</p>
 <label class="check"><input id="tg-enabled" type="checkbox" /><span data-i18n="开启 Telegram 机器人">开启 Telegram 机器人</span></label>
 <label>Telegram Bot Token<input id="tg-token" type="password" autocomplete="new-password" spellcheck="false" /></label>
-<label class="check"><input id="tg-receive" type="checkbox" checked /><span data-i18n="接收 TG 消息到网站">接收 TG 消息到网站</span></label>
-<label class="check"><input id="tg-receive-private" type="checkbox" checked /><span data-i18n="收到的 TG 消息默认设为隐私（含图片与附件）">收到的 TG 消息默认设为隐私（含图片与附件）</span></label>
-<label class="check"><input id="tg-send" type="checkbox" checked /><span data-i18n="网站新消息发送到 TG">网站新消息发送到 TG</span></label>
-<label class="check"><input id="tg-private" type="checkbox" /><span data-i18n="同时转发隐私遮挡消息（含正文与附件）">同时转发隐私遮挡消息（含正文与附件）</span></label>
-<p class="warning">开启发送后 Telegram 会保存消息副本；网页删除或到期不会删除该副本。附件接收最多 20 MB、发送最多 50 MB。仅同步绑定私聊，不补发历史消息。</p>
 <div class="binding-actions"><button class="primary" data-i18n="保存设置">保存设置</button></div>
 <section class="telegram-section"><h3 data-i18n="连接与账户绑定">连接与账户绑定</h3>
 <p id="tg-binding-status" class="binding-status" role="status"></p>
@@ -369,67 +352,19 @@
 <div id="tg-command-box" class="binding-command" hidden><label for="tg-command" data-i18n="在 Telegram 私聊发送以下完整指令">在 Telegram 私聊发送以下完整指令</label><input id="tg-command" readonly autocomplete="off" spellcheck="false" /><p class="muted" data-i18n="绑定码五分钟有效、仅可使用一次。请勿分享，重新生成会使旧码失效。">绑定码五分钟有效、仅可使用一次。请勿分享，重新生成会使旧码失效。</p></div>
 
 <button id="tg-retry" type="button" class="secondary" data-i18n="重试失败发送">重试失败发送</button><p id="tg-status" class="muted small" role="status"></p></section>
+<section class="telegram-section"><h3>机器人设置</h3><label class="check"><input id="tg-receive" type="checkbox" checked /><span data-i18n="接收 TG 消息到网站">接收 TG 消息到网站</span></label>
+<label class="check"><input id="tg-receive-private" type="checkbox" checked /><span data-i18n="收到的 TG 消息默认设为隐私（含图片与附件）">收到的 TG 消息默认设为隐私（含图片与附件）</span></label>
+<label class="check"><input id="tg-send" type="checkbox" checked /><span data-i18n="网站新消息发送到 TG">网站新消息发送到 TG</span></label>
+<label class="check"><input id="tg-private" type="checkbox" /><span data-i18n="同时转发隐私遮挡消息（含正文与附件）">同时转发隐私遮挡消息（含正文与附件）</span></label>
+<p class="warning">开启发送后 Telegram 会保存消息副本；网页删除或到期不会删除该副本。附件接收最多 20 MB、发送最多 50 MB。仅同步绑定私聊，不补发历史消息。</p>
+<div class="binding-actions"><button class="primary">保存设置</button></div></section>
 <section class="telegram-section"><h3 data-i18n="机器人指令">机器人指令</h3><dl class="telegram-commands"><dt><code>/help</code></dt><dd>消息同步帮助</dd><dt><code>/bind 绑定码</code></dt><dd>绑定当前网站账户</dd></dl></section></form>
-          <form id="storage-form" class="settings-card">
-            <h3 data-i18n="添加远程存储">添加远程存储</h3>
-            <div class="form-grid">
-              <label
-                ><span data-i18n="类型">类型</span><select id="storage-kind">
-                  <option value="webdav">WebDAV</option>
-                  <option value="smb">SMB / CIFS</option>
-                </select></label
-              ><label
-                ><span data-i18n="显示名称">显示名称</span><input
-                  id="storage-name"
-                  placeholder="我的 NAS" data-i18n-placeholder="我的 NAS"
-                  required
-              /></label>
-            </div>
-            <label id="storage-url-label"
-              ><span data-i18n="服务地址 / SMB 主机">服务地址 / SMB 主机</span><input
-                id="storage-url"
-                placeholder="https://nas.example.com/dav/ 或 192.168.1.10" data-i18n-placeholder="https://nas.example.com/dav/ 或 192.168.1.10"
-                required /></label
-            ><label
-              ><span data-i18n="存储目录">存储目录</span><input
-                id="storage-root"
-                placeholder="WebDAV：pocket-relay；SMB：共享名/pocket-relay" data-i18n-placeholder="WebDAV：pocket-relay；SMB：共享名/pocket-relay"
-            /></label>
-            <div class="form-grid">
-              <label><span data-i18n="用户名">用户名</span><input id="storage-user" autocomplete="off" /></label
-              ><label
-                ><span data-i18n="密码">密码</span><input
-                  id="storage-password"
-                  type="password"
-                  autocomplete="new-password" /></label
-              ><label
-                ><span data-i18n="SMB 域（可选）">SMB 域（可选）</span><input
-                  id="storage-domain"
-                  placeholder="WORKGROUP"
-              /></label>
-            </div>
-            <p data-i18n="密码加密保存在 data。使用专用目录；测试会写入并删除一个随机测试文件。HTTPS 不跳过证书验证。" class="muted small">
-              密码加密保存在
-              data。使用专用目录；测试会写入并删除一个随机测试文件。HTTPS
-              不跳过证书验证。
-            </p>
-            <div class="button-row">
-              <button data-i18n="测试连接" type="button" id="storage-test" class="secondary">
-                测试连接</button
-              ><button data-i18n="测试并添加" class="primary">测试并添加</button>
-            </div>
-          </form>
-          <div class="settings-card">
-            <h3 data-i18n="临时账户">临时账户</h3>
-            <div id="users-list"></div>
-            <p data-i18n="到期后立即失去访问权限，已保存的永久消息不会随账户到期删除。可在此延长账户有效期。" class="muted small">
-              到期后立即失去访问权限，已保存的永久消息不会随账户到期删除。可在此延长账户有效期。
-            </p>
-          </div>
+
+
           <div class="settings-card">
             <h3 data-i18n="加密备份与恢复">加密备份与恢复</h3>
-            <p data-i18n="包含账户、验证器密钥、所有设置和全部附件（包括 WebDAV/SMB）。恢复后附件保存在本地，原存储连接配置保留；远程附件不可读取时备份会失败。" class="muted">
-              包含账户、验证器密钥、所有设置和全部附件（包括 WebDAV/SMB）。恢复后附件保存在本地，原存储连接配置保留；远程附件不可读取时备份会失败。
+            <p data-i18n="包含登录验证器、消息、设置及全部附件。恢复后附件保存在本地；旧版远程附件必须可读才能完整导出。" class="muted">
+              包含登录验证器、消息、设置及全部附件。恢复后附件保存在本地；旧版远程附件必须可读才能完整导出。
             </p>
             <label
               ><span data-i18n="备份密码（至少 12 个字符）">备份密码（至少 12 个字符）</span><input
@@ -446,7 +381,7 @@
               <button id="restore-choose" class="backup-pick" type="button"><span aria-hidden="true">＋</span><span data-i18n="选择备份包">选择备份包</span></button>
               <span id="restore-name" class="backup-file-name" data-i18n="尚未选择备份包">尚未选择备份包</span>
             </div>
-            <label class="check backup-confirm"><input id="restore-confirm" type="checkbox" /><span data-i18n="我已备份当前数据，确认用备份包替换。">我已备份当前数据，确认用备份包替换。</span></label>
+
             <button id="restore-start" class="backup-restore" type="button" disabled data-i18n="校验并导入备份">校验并导入备份</button>
             <p data-i18n="恢复会替换整个站点数据并重启容器；现有 data 会保留在 previous-* 目录供人工恢复。首次初始化请在可信网络完成，不要把未初始化站点暴露公网。" class="warning">
               恢复会替换整个站点数据并重启容器；现有 data 会保留在 previous-*

@@ -348,6 +348,10 @@ func (a *app) login(w http.ResponseWriter, r *http.Request) {
 		fail(w, 401, "账户或验证码不正确")
 		return
 	}
+	if a.personal && u.ID != a.personalOwner() {
+		fail(w, 401, "账户或验证码不正确")
+		return
+	}
 	if u.Expires > 0 && u.Expires <= now() {
 		fail(w, 401, "此账户已过期，请联系管理员延长有效期")
 		return

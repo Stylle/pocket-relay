@@ -38,3 +38,7 @@ Docker Hub 发布凭据使用 DOCKERHUB_USERNAME、DOCKERHUB_TOKEN；GitHub Acti
 ## 通知与测试约定
 
 配置权限、账户模型保持原样，不新增分用户配置。Telegram 使用保存 Token、一次性绑定码、私聊 /bind；不恢复手填 Chat ID 和测试发送按钮。绑定和启动后注册原有业务菜单。Webhook/飞牛直接测试当前草稿，不保存、不启用、空密钥只在服务端合并；保存与测试互斥并拒绝过期结果。共享模块及 Vue 面板按 shared-components.json 同步。详见 integration-tests.md。
+
+## 个人使用模式（0.10.0 起）
+
+生产入口启动时必须 enablePersonalMode：仅首个管理员可登录，新文件固定 local；旧消息/附件归到该部署者，撤销其他账户持久登录。历史库结构、读取适配器仅用于备份/旧附件兼容，不在生产路由开放用户和远程存储管理。测试旧格式兼容的 openApp 不自动迁移；个人模式回归必须显式执行生产入口同一迁移函数并检查认证、入口关闭和幂等性。不要删除历史附件或为了迁移重建数据卷。

@@ -6,14 +6,14 @@
 
 ## 能做什么
 
-- 同一账户、多设备同步，消息互相隔离；支持拖放、多选与粘贴图片。
+- 部署者个人使用、多设备同步；支持拖放、多选与粘贴图片。
 - 复制文字和图片、下载文件，消息默认永久保留，也可设置有效期。
-- 标准 TOTP 验证器登录；刷新保留登录、可配置空闲超时、主动退出；公开注册默认关闭。
+- 标准 TOTP 验证器登录；刷新保留登录、可配置空闲超时、主动退出；不开放公开注册。
 - 今日消息按当前设备本地日期集中显示，跨天自动切换；本次消息与历史折叠；全部记录文字/时间搜索；网址、邮箱、手机号可点击；原文复制不变。
 - 点隐私消息展开，刷新重新隐藏；已发消息可设为/取消隐私（非内容加密）。图片使用小缩略图，点击查看原图；隐私图片点击前不加载。
 - 手机紧凑输入框；后台消息字号大/中/小，保存后所有设备沿用；视频仍按需加载，不自动播放。
-- Telegram 机器人双向同步，后台独立开启接收/发送，绑定私聊和归属账户；默认关闭。
-- 本地、WebDAV、SMB 存储；密码加密的整站备份与恢复。
+- Telegram 机器人双向同步，后台独立开启接收/发送，绑定部署者私聊；默认关闭。
+- 本地存储；密码加密的整站备份与恢复。
 
 ## 最简部署
 
@@ -45,7 +45,7 @@ volumes:
 docker compose -f docker-compose.yml up -d
 ```
 
-打开 `http://服务器IP:28182`，在可信内网绑定验证器。**第一个完成绑定的账户获得永久管理员权限。**无需环境变量、`.env` 或 setup-token；命名卷由 Docker 管理权限。
+打开 `http://服务器IP:28182`，在可信内网绑定验证器。**首次绑定创建唯一部署者登录。**无需环境变量、`.env` 或 setup-token；命名卷由 Docker 管理权限。
 
 ## 使用与维护
 
@@ -54,8 +54,8 @@ docker compose -f docker-compose.yml up -d
 | 想了解 | 说明 |
 | --- | --- |
 | 指定宿主机文件夹、权限、源码构建 | [部署指南](https://github.com/Stylle/pocket-relay/blob/main/docs/guide.md#docker-compose-部署) · [文件夹挂载模板](https://github.com/Stylle/pocket-relay/blob/main/docker-compose.nas.yml) |
-| 登录、临时账户、上传、复制、保留时间 | [使用指南](https://github.com/Stylle/pocket-relay/blob/main/docs/guide.md#使用) |
-| WebDAV / SMB、加密边界、备份与恢复 | [存储与备份](https://github.com/Stylle/pocket-relay/blob/main/docs/guide.md#存储与备份) |
+| 登录、上传、复制、保留时间 | [使用指南](https://github.com/Stylle/pocket-relay/blob/main/docs/guide.md#使用) |
+| 本地存储、加密边界、备份与恢复 | [存储与备份](https://github.com/Stylle/pocket-relay/blob/main/docs/guide.md#存储与备份) |
 | 升级镜像、开发与测试 | [更新与开发](https://github.com/Stylle/pocket-relay/blob/main/docs/guide.md#更新与开发) |
 
 更新前备份数据，再执行 `docker compose -f docker-compose.yml pull` 和 `docker compose -f docker-compose.yml up -d`。保留原卷，不要执行 `down -v`。
@@ -66,14 +66,14 @@ docker compose -f docker-compose.yml up -d
 
 后台可设置「收到的 TG 消息默认设为隐私」，初始开启，仅影响以后收到的消息。隐私状态影响文本与附件预览，文件名仍显示；用户主动下载仍可获取本人附件。改变隐私会取消尚未发送的 TG 队列，不会补发取消隐私的旧消息，也无法撤回已经送达或正在发送的第三方副本。
 
-登录时可勾选「记住登录状态（7 天）」：固定 7 天内重新打开页面、浏览器或正常重启容器无需验证，不受空闲超时影响；主动退出立即撤销，临时账户到期仍失效。默认不勾选，此时仅同一标签页刷新保留登录，遵循后台空闲超时设置。长期凭据使用 HttpOnly、SameSite Cookie，服务端只存哈希，不写入 localStorage；公网请使用 HTTPS。复制图片依赖 HTTPS 或 localhost 与浏览器支持。文件不是端到端加密；管理员整站备份包含全部账户数据，新备份包含远程附件本体，远程存储须在导出时可读。当前未接入微信机器人。
+登录时可勾选「记住登录状态（7 天）」：固定 7 天内重新打开页面、浏览器或正常重启容器无需验证，不受空闲超时影响；主动退出立即撤销，默认不勾选，此时仅同一标签页刷新保留登录，遵循后台空闲超时设置。长期凭据使用 HttpOnly、SameSite Cookie，服务端只存哈希，不写入 localStorage；公网请使用 HTTPS。复制图片依赖 HTTPS 或 localhost 与浏览器支持。文件不是端到端加密；管理员整站备份包含全部账户数据，新备份包含远程附件本体，远程存储须在导出时可读。当前未接入微信机器人。
 
 
 ## 界面、关于与兼容升级
 
 - 保持原页面布局，仅统一配色与组件样式；亮色／暗色／跟随系统，默认跟随系统，支持中英切换。
 - 菜单中的「关于」或 `/about.html` 关于页面 查看版本、版权、许可与数据安全边界。
-- 本次 UI 不修改业务接口、数据库和附件布局。升级前备份完整 data，重建时继续使用同一挂载；不要删除数据卷。
+- 个人模式升级会保留数据库和附件，并迁移旧消息归属。升级前备份完整 data，重建时继续使用同一挂载；不要删除数据卷。
 - 容器服务使用 UID/GID 10001；入口仅准备专用 data 目录。NAS ACL、只读目录或特殊挂载不能自动绕过，详见迁移说明。
 - [升级与迁移](https://github.com/Stylle/pocket-relay/blob/main/docs/UI-UPGRADE.md) · [后续 Agent 复用手册](https://github.com/Stylle/pocket-relay/blob/main/docs/AGENT-HANDBOOK.md)。手册登记发布所需的 Secret 名称与权限，绝不包含真实 Token。
 
@@ -81,12 +81,12 @@ docker compose -f docker-compose.yml up -d
 
 本项目采用 [MIT License](https://github.com/Stylle/pocket-relay/blob/main/LICENSE)，可自行部署与按许可证使用。源码和镜像不包含维护者的真实部署地址、个人邮箱、访问令牌、开发电脑路径或业务数据。项目名称、公开源码链接和第三方许可证署名保留。
 
-上面的最简 Compose 即可启动。只有首次账号初始化、端口与持久化是基础部署所需；Telegram、Webhook、MQTT 或远程存储等集成均按需配置，详见使用文档。升级时保留完整数据目录。
+上面的最简 Compose 即可启动。只有首次账号初始化、端口与持久化是基础部署所需；Telegram 为可选集成，详见使用文档。升级时保留完整数据目录。
 
 
 ### 便携完整备份
 
-后台下载加密 `.prb` 包，导入时使用备份密码（至少 12 字符）。选择文件后显示文件名及大小，需勾选确认并点击「校验并导入备份」才开始恢复。账号、验证器、消息、设置、存储连接、Telegram 配置、主密钥与全部有效附件均随包迁移；恢复后的附件转为本地存储，不依赖原 WebDAV/SMB 的文件本体，原部署的附件位置不会因导出而改变。原远程存储配置及默认上传设置保留，后续向该存储上传仍需新环境可达。
+后台下载加密 `.prb` 包，导入时使用备份密码（至少 12 字符）。选择文件后显示文件名及大小，点击「校验并导入备份」后通过弹窗确认才开始恢复。账号、验证器、消息、设置、存储连接、Telegram 配置、主密钥与全部有效附件均随包迁移；恢复后的附件转为本地存储，不依赖原 WebDAV/SMB 的文件本体，原部署的附件位置不会因导出而改变。旧远程读取信息仅为兼容历史附件保留；所有新附件固定存储在本地。
 
 在新部署初始化临时管理员后导入，服务自动重新加载，再使用备份中的原账号和验证器登录。原数据保留在 `previous-*`，浏览器登录状态不恢复。旧版本备份只含当时的本地附件，升级不能补回旧包中不存在的远程文件。备份完整内容上限 20 GB；外部服务网络、端口、域名和挂载由新环境配置。不要同时启动两个连接同一 Telegram 机器人的实例。
 
@@ -94,6 +94,12 @@ docker compose -f docker-compose.yml up -d
 
 格式、共享组件、反向代理与平台验收见 [维护约定](https://github.com/Stylle/pocket-relay/blob/main/docs/MAINTENANCE.md)。升级前备份完整数据目录及应用密钥，保留原数据卷。
 
-## 通知配置
+连接／通知测试支持当前表单草稿，无需先保存；测试不保存、不启用配置。详见 [连接与通知测试](https://github.com/Stylle/pocket-relay/blob/main/docs/integration-tests.md)。
 
-Telegram（固件除外）：填写 Token、保存设置、生成绑定码，在机器人私聊发送 `/bind 绑定码`。五分钟有效、一次使用；无需 Chat ID 或测试消息。自动注册原有业务命令菜单。固件保留 Webhook/MQTT，取消 Telegram 通知。Webhook 和飞牛（如有）可直接测试当前表单，不会保存配置。原有用户和项目权限不变。
+## 通知绑定与连接测试
+
+Telegram 采用「Token → 保存 → 生成绑定码 → 私聊 `/bind`」统一流程，自动注册机器人菜单，无需手填 Chat ID 或发送测试消息。Webhook／飞牛支持直接测试当前表单而不保存。固件仅保留 Webhook／MQTT。详见 [配置说明](https://github.com/Stylle/pocket-relay/blob/main/docs/integration-tests.md)。
+
+## 个人使用版本
+
+只保留部署者验证器登录，注册、临时用户管理与远程存储配置入口已移除。升级时旧消息及附件归到原首个管理员名下，其他账户登录失效；不删除历史消息或附件。内部旧格式读取代码仅用于兼容历史附件、备份，不再提供多用户和新远程存储配置。恢复备份时使用确认弹窗，不需要额外复选框。

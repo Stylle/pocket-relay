@@ -29,7 +29,7 @@ import (
 //go:embed web/*
 var assets embed.FS
 
-const version = "0.9.2"
+const version = "0.10.0"
 
 type user struct {
 	ID      string `json:"id"`
@@ -57,6 +57,7 @@ type bucket struct {
 	Until time.Time
 }
 type app struct {
+	personal   bool
 	botBinding probe.Binding
 	db         *sql.DB
 	dir        string
@@ -182,6 +183,11 @@ func (a *app) config() settings {
 	if e := json.Unmarshal([]byte(b), &s); e != nil {
 		panic(e)
 	}
+	if a.personal {
+		s.Public = false
+		s.ActiveStore = "local"
+		s.GuestHours = 1
+	}
 	return s
 }
 func reply(w http.ResponseWriter, status int, v any) {
@@ -212,6 +218,9 @@ func (a *app) findUser(id string) (user, error) {
 	e := a.db.QueryRow(`SELECT id,name,admin,expires FROM users WHERE id=?`, id).Scan(&u.ID, &u.Name, &u.Admin, &u.Expires)
 	if e == nil && u.Expires > 0 && u.Expires <= now() {
 		e = errors.New("expired")
+	}
+	if e == nil && a.personal && u.ID != a.personalOwner() {
+		e = errors.New("owner only")
 	}
 	return u, e
 }
@@ -294,9 +303,11 @@ func (a *app) handler() http.Handler {
 	mux.HandleFunc("POST /api/admin/telegram/unbind", a.relayBindingRoute)
 	mux.HandleFunc("PUT /api/admin/telegram", a.telegramSave)
 	mux.HandleFunc("POST /api/admin/telegram/retry", a.telegramRetry)
-	mux.HandleFunc("POST /api/admin/storage", a.addStore)
-	mux.HandleFunc("POST /api/admin/storage/test", a.testStore)
-	mux.HandleFunc("PUT /api/admin/users/{id}", a.updateUser)
+	if !a.personal {
+		mux.HandleFunc("POST /api/admin/storage", a.addStore)
+		mux.HandleFunc("POST /api/admin/storage/test", a.testStore)
+		mux.HandleFunc("PUT /api/admin/users/{id}", a.updateUser)
+	}
 	mux.HandleFunc("POST /api/admin/backup", a.exportBackup)
 	mux.HandleFunc("POST /api/admin/restore", a.restoreBackup)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
@@ -352,6 +363,9 @@ func runMain() bool {
 		log.Fatal("无法打开 data：", e)
 	}
 	defer a.db.Close()
+	if e = a.enablePersonalMode(); e != nil {
+		log.Fatal("个人数据迁移未完成，原数据保留")
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	var telegramWorkers sync.WaitGroup
